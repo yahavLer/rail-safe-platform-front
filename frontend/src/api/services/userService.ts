@@ -1,13 +1,13 @@
-import { api } from '../config';
+import { userHttp } from "../http"; // תתאימי נתיב לפי המיקום האמיתי של http.ts
 import type {
   UserBoundary,
   CreateUserBoundary,
   UpdateUserBoundary,
   UpdateRoleBoundary,
   AssignOrgUnitBoundary,
-} from '../types';
+} from "../types";
 
-const BASE_PATH = '/api/users';
+const BASE_PATH = "/api/users";
 
 export interface UserFilters {
   orgId?: string;
@@ -17,42 +17,42 @@ export interface UserFilters {
 
 function buildQueryString(filters: UserFilters): string {
   const params = new URLSearchParams();
-  
+
   Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
+    if (value !== undefined && value !== null && value !== "") {
       params.append(key, String(value));
     }
   });
-  
+
   return params.toString();
 }
 
 export const userService = {
   // CRUD
-  create: (data: CreateUserBoundary) =>
-    api.post<UserBoundary>(BASE_PATH, data),
+  create: async (data: CreateUserBoundary) =>
+    (await userHttp.post<UserBoundary>(BASE_PATH, data)).data,
 
-  getById: (id: string) =>
-    api.get<UserBoundary>(`${BASE_PATH}/${id}`),
+  getById: async (id: string) =>
+    (await userHttp.get<UserBoundary>(`${BASE_PATH}/${id}`)).data,
 
-  getByExternalAuthId: (externalAuthId: string) =>
-    api.get<UserBoundary>(`${BASE_PATH}/by-external/${externalAuthId}`),
+  getByExternalAuthId: async (externalAuthId: string) =>
+    (await userHttp.get<UserBoundary>(`${BASE_PATH}/by-external/${externalAuthId}`)).data,
 
-  list: (filters: UserFilters = {}) => {
+  list: async (filters: UserFilters = {}) => {
     const queryString = buildQueryString(filters);
     const endpoint = queryString ? `${BASE_PATH}?${queryString}` : BASE_PATH;
-    return api.get<UserBoundary[]>(endpoint);
+    return (await userHttp.get<UserBoundary[]>(endpoint)).data;
   },
 
-  update: (id: string, data: UpdateUserBoundary) =>
-    api.patch<UserBoundary>(`${BASE_PATH}/${id}`, data),
+  update: async (id: string, data: UpdateUserBoundary) =>
+    (await userHttp.patch<UserBoundary>(`${BASE_PATH}/${id}`, data)).data,
 
-  updateRole: (id: string, data: UpdateRoleBoundary) =>
-    api.patch<UserBoundary>(`${BASE_PATH}/${id}/role`, data),
+  updateRole: async (id: string, data: UpdateRoleBoundary) =>
+    (await userHttp.patch<UserBoundary>(`${BASE_PATH}/${id}/role`, data)).data,
 
-  assignOrgUnit: (id: string, data: AssignOrgUnitBoundary) =>
-    api.patch<UserBoundary>(`${BASE_PATH}/${id}/org-unit`, data),
+  assignOrgUnit: async (id: string, data: AssignOrgUnitBoundary) =>
+    (await userHttp.patch<UserBoundary>(`${BASE_PATH}/${id}/org-unit`, data)).data,
 
-  delete: (id: string) =>
-    api.delete<void>(`${BASE_PATH}/${id}`),
+  delete: async (id: string) =>
+    (await userHttp.delete<void>(`${BASE_PATH}/${id}`)).data,
 };

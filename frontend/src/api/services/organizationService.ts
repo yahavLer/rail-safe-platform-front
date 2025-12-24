@@ -1,4 +1,4 @@
-import { api } from '../config';
+import { orgHttp } from "../http";
 import type {
   OrganizationBoundary,
   CreateOrganizationBoundary,
@@ -8,44 +8,55 @@ import type {
   CategoryBoundary,
   CreateCategoryBoundary,
   UpdateCategoryBoundary,
-} from '../types';
+} from "../types";
 
-const BASE_PATH = '/api/organizations';
+const BASE_PATH = "/api/organizations";
 
 export const organizationService = {
   // Organization CRUD
-  create: (data: CreateOrganizationBoundary) =>
-    api.post<OrganizationBoundary>(`${BASE_PATH}/create`, data),
+  create: async (data: CreateOrganizationBoundary) =>
+    (await orgHttp.post<OrganizationBoundary>(`${BASE_PATH}/create`, data)).data,
 
-  getById: (orgId: string) =>
-    api.get<OrganizationBoundary>(`${BASE_PATH}/${orgId}`),
+  getById: async (orgId: string) =>
+    (await orgHttp.get<OrganizationBoundary>(`${BASE_PATH}/${orgId}`)).data,
 
   // Risk Matrix
-  getRiskMatrix: (orgId: string) =>
-    api.get<RiskMatrixBoundary>(`${BASE_PATH}/${orgId}/risk-matrix`),
+  getRiskMatrix: async (orgId: string) =>
+    (await orgHttp.get<RiskMatrixBoundary>(`${BASE_PATH}/${orgId}/risk-matrix`)).data,
 
-  updateFrequencyDescription: (orgId: string, level: number, data: UpdateDescriptionBoundary) =>
-    api.patch<LevelDefinitionBoundary>(
+  updateFrequencyDescription: async (
+    orgId: string,
+    level: number,
+    data: UpdateDescriptionBoundary
+  ) =>
+    (await orgHttp.patch<LevelDefinitionBoundary>(
       `${BASE_PATH}/${orgId}/risk-matrix/frequency/${level}`,
       data
-    ),
+    )).data,
 
-  updateSeverityDescription: (orgId: string, level: number, data: UpdateDescriptionBoundary) =>
-    api.patch<LevelDefinitionBoundary>(
+  updateSeverityDescription: async (
+    orgId: string,
+    level: number,
+    data: UpdateDescriptionBoundary
+  ) =>
+    (await orgHttp.patch<LevelDefinitionBoundary>(
       `${BASE_PATH}/${orgId}/risk-matrix/severity/${level}`,
       data
-    ),
+    )).data,
 
   // Categories
-  createCategory: (orgId: string, data: CreateCategoryBoundary) =>
-    api.post<CategoryBoundary>(`${BASE_PATH}/${orgId}/categories`, data),
+  createCategory: async (orgId: string, data: CreateCategoryBoundary) =>
+    (await orgHttp.post<CategoryBoundary>(`${BASE_PATH}/${orgId}/categories`, data)).data,
 
-  listCategories: (orgId: string) =>
-    api.get<CategoryBoundary[]>(`${BASE_PATH}/${orgId}/categories`),
+  listCategories: async (orgId: string) =>
+    (await orgHttp.get<CategoryBoundary[]>(`${BASE_PATH}/${orgId}/categories`)).data,
 
-  updateCategory: (orgId: string, categoryId: string, data: UpdateCategoryBoundary) =>
-    api.patch<CategoryBoundary>(`${BASE_PATH}/${orgId}/categories/${categoryId}`, data),
+  updateCategory: async (orgId: string, categoryId: string, data: UpdateCategoryBoundary) =>
+    (await orgHttp.patch<CategoryBoundary>(
+      `${BASE_PATH}/${orgId}/categories/${categoryId}`,
+      data
+    )).data,
 
-  deleteCategory: (orgId: string, categoryId: string) =>
-    api.delete<void>(`${BASE_PATH}/${orgId}/categories/${categoryId}`),
+  deleteCategory: async (orgId: string, categoryId: string) =>
+    (await orgHttp.delete<void>(`${BASE_PATH}/${orgId}/categories/${categoryId}`)).data,
 };

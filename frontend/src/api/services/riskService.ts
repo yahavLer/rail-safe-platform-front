@@ -1,4 +1,4 @@
-import { api } from '../config';
+import { riskHttp } from "../http"; 
 import type {
   RiskBoundary,
   CreateRiskBoundary,
@@ -6,9 +6,9 @@ import type {
   UpdateRiskStatusBoundary,
   RiskStatus,
   RiskClassification,
-} from '../types';
+} from "../types";
 
-const BASE_PATH = '/api/risks';
+const BASE_PATH = "/api/risks";
 
 export interface RiskFilters {
   orgId: string;
@@ -24,40 +24,40 @@ export interface RiskFilters {
 
 function buildQueryString(filters: RiskFilters): string {
   const params = new URLSearchParams();
-  
+
   Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
+    if (value !== undefined && value !== null && value !== "") {
       params.append(key, String(value));
     }
   });
-  
+
   return params.toString();
 }
 
 export const riskService = {
   // CRUD
-  create: (data: CreateRiskBoundary) =>
-    api.post<RiskBoundary>(BASE_PATH, data),
+  create: async (data: CreateRiskBoundary) =>
+    (await riskHttp.post<RiskBoundary>(BASE_PATH, data)).data,
 
-  getById: (riskId: string) =>
-    api.get<RiskBoundary>(`${BASE_PATH}/${riskId}`),
+  getById: async (riskId: string) =>
+    (await riskHttp.get<RiskBoundary>(`${BASE_PATH}/${riskId}`)).data,
 
-  list: (filters: RiskFilters) =>
-    api.get<RiskBoundary[]>(`${BASE_PATH}?${buildQueryString(filters)}`),
+  list: async (filters: RiskFilters) =>
+    (await riskHttp.get<RiskBoundary[]>(`${BASE_PATH}?${buildQueryString(filters)}`)).data,
 
-  update: (riskId: string, data: UpdateRiskBoundary) =>
-    api.patch<RiskBoundary>(`${BASE_PATH}/${riskId}`, data),
+  update: async (riskId: string, data: UpdateRiskBoundary) =>
+    (await riskHttp.patch<RiskBoundary>(`${BASE_PATH}/${riskId}`, data)).data,
 
-  updateStatus: (riskId: string, data: UpdateRiskStatusBoundary) =>
-    api.patch<RiskBoundary>(`${BASE_PATH}/${riskId}/status`, data),
+  updateStatus: async (riskId: string, data: UpdateRiskStatusBoundary) =>
+    (await riskHttp.patch<RiskBoundary>(`${BASE_PATH}/${riskId}/status`, data)).data,
 
-  delete: (riskId: string) =>
-    api.delete<void>(`${BASE_PATH}/${riskId}`),
+  delete: async (riskId: string) =>
+    (await riskHttp.delete<void>(`${BASE_PATH}/${riskId}`)).data,
 
   // Stats
-  countByStatus: (orgId: string) =>
-    api.get<Record<RiskStatus, number>>(`${BASE_PATH}/stats/by-status?orgId=${orgId}`),
+  countByStatus: async (orgId: string) =>
+    (await riskHttp.get<Record<RiskStatus, number>>(`${BASE_PATH}/stats/by-status?orgId=${orgId}`)).data,
 
-  countByClassification: (orgId: string) =>
-    api.get<Record<RiskClassification, number>>(`${BASE_PATH}/stats/by-classification?orgId=${orgId}`),
+  countByClassification: async (orgId: string) =>
+    (await riskHttp.get<Record<RiskClassification, number>>(`${BASE_PATH}/stats/by-classification?orgId=${orgId}`)).data,
 };
