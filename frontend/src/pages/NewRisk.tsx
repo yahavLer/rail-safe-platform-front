@@ -1,25 +1,27 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/select";
+
+import { cn } from "@/lib/utils";
 import {
-  CATEGORIES,
   LIKELIHOOD_LABELS,
   IMPACT_LABELS,
   calculateScore,
   calculateSeverity,
   SEVERITY_LABELS,
-} from '@/types/risk';
+} from "@/types/risk";
+
 import {
   FileText,
   Tag,
@@ -29,39 +31,91 @@ import {
   Check,
   ArrowLeft,
   ArrowRight,
-} from 'lucide-react';
-import { toast } from 'sonner';
+} from "lucide-react";
+
+import { toast } from "sonner";
+
+import { riskService } from "@/api/services/riskService";
+import { organizationService } from "@/api/services/organizationService";
+import type { CategoryBoundary } from "@/api/types";
+import { DEFAULT_ORG_ID } from "@/api/config";
 
 const STEPS = [
-  { id: 1, title: 'תיאור הסיכון', icon: FileText },
-  { id: 2, title: 'קטגוריה ומיקום', icon: Tag },
-  { id: 3, title: 'סבירות', icon: BarChart3 },
-  { id: 4, title: 'השפעה', icon: Zap },
-  { id: 5, title: 'בקרות וסיכום', icon: Shield },
+  { id: 1, title: "תיאור הסיכון", icon: FileText },
+  { id: 2, title: "קטגוריה ומיקום", icon: Tag },
+  { id: 3, title: "סבירות", icon: BarChart3 },
+  { id: 4, title: "השפעה", icon: Zap },
+  { id: 5, title: "בקרות וסיכום", icon: Shield },
 ];
 
 export default function NewRisk() {
   const navigate = useNavigate();
+
   const [currentStep, setCurrentStep] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    category: '',
-    siteName: '',
+    title: "",
+    description: "",
+    categoryCode: "",
+    siteName: "",
     likelihood: 0,
     impact: 0,
-    notes: '',
+    notes: "",
   });
 
+  const [categories, setCategories] = useState<CategoryBoundary[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+
   const score = calculateScore(formData.likelihood, formData.impact);
-  const severity = formData.likelihood && formData.impact ? calculateSeverity(score) : null;
+  const severity =
+    formData.likelihood && formData.impact ? calculateSeverity(score) : null;
+
+  // --- Fetch categories from server ---
+  const fetchCategories = async () => {
+    if (!DEFAULT_ORG_ID) {
+      toast.error("חסר ORG_ID", {
+        description: "בדקי ש-VITE_ORG_ID מוגדר ל-UUID אמיתי ב-.env",
+      });
+      return;
+    }
+
+    setCategoriesLoading(true);
+    try {
+      const data = await organizationService.listCategories(DEFAULT_ORG_ID);
+
+      const activeSorted = data
+        .filter((c) => c.active)
+        .sort((a, b) => a.displayOrder - b.displayOrder);
+
+      setCategories(activeSorted);
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.message ||
+        "לא ניתן למשוך קטגוריות מהשרת";
+      toast.error("שגיאה בטעינת קטגוריות", { description: msg });
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
+  // Load categories when entering step 2 (once)
+  useEffect(() => {
+    if (currentStep !== 2) return;
+    if (categoriesLoading) return;
+    if (categories.length > 0) return;
+
+    fetchCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
 
   const canProceed = () => {
     switch (currentStep) {
       case 1:
         return formData.title.length >= 5 && formData.description.length >= 10;
       case 2:
-        return formData.category !== '';
+        return formData.categoryCode !== "";
       case 3:
         return formData.likelihood > 0;
       case 4:
@@ -73,22 +127,59 @@ export default function NewRisk() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (submitting) return;
+
     if (currentStep < 5) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      // Submit
-      toast.success('הסיכון נוצר בהצלחה!', {
+      setCurrentStep((s) => s + 1);
+      return;
+    }
+
+    // Step 5: Submit to backend
+    try {
+      if (!DEFAULT_ORG_ID) {
+        throw new Error(
+          "חסר VITE_ORG_ID (.env) — חובה organizationId כדי ליצור סיכון"
+        );
+      }
+
+      setSubmitting(true);
+
+      const payload = {
+        organizationId: DEFAULT_ORG_ID, // UUID חובה
+
+        title: formData.title,
+        description: formData.description,
+
+        // חייב להיות GH1..GH21 לפי ה-Pattern בבקאנד
+        categoryCode: formData.categoryCode,
+
+        // mapping: likelihood/impact => frequencyLevel/severityLevel
+        frequencyLevel: formData.likelihood,
+        severityLevel: formData.impact,
+
+        location: formData.siteName || undefined,
+        notes: formData.notes || undefined,
+      };
+
+      await riskService.create(payload as any);
+
+      toast.success("הסיכון נוצר בהצלחה!", {
         description: `${formData.title} - ציון ${score}`,
       });
-      navigate('/risks');
+
+      navigate("/risks");
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message || err?.message || "שגיאה לא ידועה";
+      toast.error("יצירת הסיכון נכשלה", { description: msg });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
+    if (currentStep > 1) setCurrentStep((s) => s - 1);
   };
 
   return (
@@ -108,12 +199,12 @@ export default function NewRisk() {
             <div key={step.id} className="flex items-center">
               <div
                 className={cn(
-                  'flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300',
+                  "flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300",
                   currentStep === step.id
-                    ? 'border-primary bg-primary text-primary-foreground'
+                    ? "border-primary bg-primary text-primary-foreground"
                     : currentStep > step.id
-                    ? 'border-risk-low bg-risk-low text-white'
-                    : 'border-border bg-background text-muted-foreground'
+                    ? "border-risk-low bg-risk-low text-white"
+                    : "border-border bg-background text-muted-foreground"
                 )}
               >
                 {currentStep > step.id ? (
@@ -124,21 +215,22 @@ export default function NewRisk() {
               </div>
               <span
                 className={cn(
-                  'mr-2 hidden text-sm font-medium sm:block',
+                  "mr-2 hidden text-sm font-medium sm:block",
                   currentStep === step.id
-                    ? 'text-primary'
+                    ? "text-primary"
                     : currentStep > step.id
-                    ? 'text-risk-low'
-                    : 'text-muted-foreground'
+                    ? "text-risk-low"
+                    : "text-muted-foreground"
                 )}
               >
                 {step.title}
               </span>
+
               {index < STEPS.length - 1 && (
                 <div
                   className={cn(
-                    'mx-4 h-0.5 w-8 rounded transition-colors duration-300',
-                    currentStep > step.id ? 'bg-risk-low' : 'bg-border'
+                    "mx-4 h-0.5 w-8 rounded transition-colors duration-300",
+                    currentStep > step.id ? "bg-risk-low" : "bg-border"
                   )}
                 />
               )}
@@ -166,6 +258,7 @@ export default function NewRisk() {
                 תאר את הסיכון בקצרה (לפחות 5 תווים)
               </p>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="description">תיאור מפורט *</Label>
               <Textarea
@@ -189,24 +282,51 @@ export default function NewRisk() {
           <div className="space-y-6">
             <div className="space-y-2">
               <Label>קטגוריה *</Label>
+
               <Select
-                value={formData.category}
+                value={formData.categoryCode}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, category: value })
+                  setFormData({ ...formData, categoryCode: value })
                 }
+                onOpenChange={(open) => {
+                  if (!open) return;
+
+                  // Lazy-load categories when user opens the dropdown
+                  if (!categoriesLoading && categories.length === 0) {
+                    fetchCategories();
+                  }
+                }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="בחר קטגוריה" />
+                  <SelectValue
+                    placeholder={
+                      categoriesLoading ? "טוען קטגוריות..." : "בחר קטגוריה"
+                    }
+                  />
                 </SelectTrigger>
+
                 <SelectContent>
-                  {CATEGORIES.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
+                  {categoriesLoading && (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      טוען...
+                    </div>
+                  )}
+
+                  {!categoriesLoading && categories.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      אין קטגוריות לארגון הזה
+                    </div>
+                  )}
+
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.code}>
+                      {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="siteName">מיקום / אתר</Label>
               <Input
@@ -230,24 +350,27 @@ export default function NewRisk() {
                 מה הסבירות שהסיכון יתממש?
               </p>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               {[1, 2, 3, 4].map((value) => (
                 <button
                   key={value}
                   type="button"
-                  onClick={() =>
-                    setFormData({ ...formData, likelihood: value })
-                  }
+                  onClick={() => setFormData({ ...formData, likelihood: value })}
                   className={cn(
-                    'flex flex-col items-center justify-center rounded-xl border-2 p-6 transition-all duration-200',
+                    "flex flex-col items-center justify-center rounded-xl border-2 p-6 transition-all duration-200",
                     formData.likelihood === value
-                      ? 'border-primary bg-primary/5 shadow-glow'
-                      : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                      ? "border-primary bg-primary/5 shadow-glow"
+                      : "border-border hover:border-primary/50 hover:bg-muted/50"
                   )}
                 >
                   <span className="text-3xl font-bold">{value}</span>
                   <span className="mt-2 text-sm font-medium">
-                    {LIKELIHOOD_LABELS[value as keyof typeof LIKELIHOOD_LABELS]}
+                    {
+                      LIKELIHOOD_LABELS[
+                        value as keyof typeof LIKELIHOOD_LABELS
+                      ]
+                    }
                   </span>
                 </button>
               ))}
@@ -264,6 +387,7 @@ export default function NewRisk() {
                 מה תהיה ההשפעה אם הסיכון יתממש?
               </p>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               {[1, 2, 3, 4].map((value) => (
                 <button
@@ -271,10 +395,10 @@ export default function NewRisk() {
                   type="button"
                   onClick={() => setFormData({ ...formData, impact: value })}
                   className={cn(
-                    'flex flex-col items-center justify-center rounded-xl border-2 p-6 transition-all duration-200',
+                    "flex flex-col items-center justify-center rounded-xl border-2 p-6 transition-all duration-200",
                     formData.impact === value
-                      ? 'border-primary bg-primary/5 shadow-glow'
-                      : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                      ? "border-primary bg-primary/5 shadow-glow"
+                      : "border-border hover:border-primary/50 hover:bg-muted/50"
                   )}
                 >
                   <span className="text-3xl font-bold">{value}</span>
@@ -301,11 +425,11 @@ export default function NewRisk() {
             {severity && (
               <div
                 className={cn(
-                  'flex items-center justify-between rounded-xl p-6',
-                  severity === 'CRITICAL' && 'bg-risk-critical-bg',
-                  severity === 'HIGH' && 'bg-risk-high-bg',
-                  severity === 'MEDIUM' && 'bg-risk-medium-bg',
-                  severity === 'LOW' && 'bg-risk-low-bg'
+                  "flex items-center justify-between rounded-xl p-6",
+                  severity === "CRITICAL" && "bg-risk-critical-bg",
+                  severity === "HIGH" && "bg-risk-high-bg",
+                  severity === "MEDIUM" && "bg-risk-medium-bg",
+                  severity === "LOW" && "bg-risk-low-bg"
                 )}
               >
                 <div>
@@ -320,11 +444,11 @@ export default function NewRisk() {
                   </p>
                   <p
                     className={cn(
-                      'text-2xl font-bold',
-                      severity === 'CRITICAL' && 'text-risk-critical',
-                      severity === 'HIGH' && 'text-risk-high',
-                      severity === 'MEDIUM' && 'text-risk-medium',
-                      severity === 'LOW' && 'text-risk-low'
+                      "text-2xl font-bold",
+                      severity === "CRITICAL" && "text-risk-critical",
+                      severity === "HIGH" && "text-risk-high",
+                      severity === "MEDIUM" && "text-risk-medium",
+                      severity === "LOW" && "text-risk-low"
                     )}
                   >
                     {SEVERITY_LABELS[severity]}
@@ -341,24 +465,33 @@ export default function NewRisk() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">קטגוריה:</span>
-                <span className="font-medium">{formData.category}</span>
+                <span className="font-medium">
+                  {categories.find((c) => c.code === formData.categoryCode)
+                    ?.name || formData.categoryCode}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">מיקום:</span>
                 <span className="font-medium">
-                  {formData.siteName || 'לא צוין'}
+                  {formData.siteName || "לא צוין"}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">סבירות:</span>
                 <span className="font-medium">
-                  {LIKELIHOOD_LABELS[formData.likelihood as keyof typeof LIKELIHOOD_LABELS]} ({formData.likelihood})
+                  {
+                    LIKELIHOOD_LABELS[
+                      formData.likelihood as keyof typeof LIKELIHOOD_LABELS
+                    ]
+                  }{" "}
+                  ({formData.likelihood})
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">השפעה:</span>
                 <span className="font-medium">
-                  {IMPACT_LABELS[formData.impact as keyof typeof IMPACT_LABELS]} ({formData.impact})
+                  {IMPACT_LABELS[formData.impact as keyof typeof IMPACT_LABELS]}{" "}
+                  ({formData.impact})
                 </span>
               </div>
             </div>
@@ -382,17 +515,14 @@ export default function NewRisk() {
 
       {/* Navigation buttons */}
       <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          onClick={handleBack}
-          disabled={currentStep === 1}
-        >
+        <Button variant="outline" onClick={handleBack} disabled={currentStep === 1 || submitting}>
           <ArrowRight className="ml-2 h-4 w-4" />
           הקודם
         </Button>
-        <Button onClick={handleNext} disabled={!canProceed()}>
-          {currentStep === 5 ? 'צור סיכון' : 'הבא'}
-          {currentStep < 5 && <ArrowLeft className="mr-2 h-4 w-4" />}
+
+        <Button onClick={handleNext} disabled={!canProceed() || submitting}>
+          {submitting ? "שומר..." : currentStep === 5 ? "צור סיכון" : "הבא"}
+          {currentStep < 5 && !submitting && <ArrowLeft className="mr-2 h-4 w-4" />}
         </Button>
       </div>
     </div>

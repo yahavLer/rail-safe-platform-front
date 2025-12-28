@@ -38,10 +38,10 @@ export interface UpdateDescriptionBoundary {
 
 export interface CategoryBoundary {
   id: string;
-  orgId: string;
   code: string;
   name: string;
-  description?: string;
+  displayOrder: number;
+  active: boolean;
 }
 
 export interface CreateCategoryBoundary {
