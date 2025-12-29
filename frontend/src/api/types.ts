@@ -57,19 +57,21 @@ export interface UpdateCategoryBoundary {
 
 // ============ Risk Boundaries ============
 export interface CreateRiskBoundary {
-  orgId: string;
+  organizationId: string;
+  title: string;
+  description: string;
+  categoryCode: string;
+  severityLevel: number;   // 1-4
+  frequencyLevel: number;  // 1-4
+  location?: string;
+  notes?: string;
+
   divisionId?: string;
   departmentId?: string;
-  categoryCode?: string;
-  title: string;
-  description?: string;
-  frequency: number; // 1-4
-  severity: number;  // 1-4
   riskManagerUserId?: string;
-  locationLat?: number;
-  locationLng?: number;
-  siteName?: string;
-  imageUrl?: string;
+
+  severityAfter?: number;
+  frequencyAfter?: number;
 }
 
 export interface RiskBoundary {
