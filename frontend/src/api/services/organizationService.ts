@@ -59,4 +59,14 @@ export const organizationService = {
 
   deleteCategory: async (orgId: string, categoryId: string) =>
     (await orgHttp.delete<void>(`${BASE_PATH}/${orgId}/categories/${categoryId}`)).data,
+
+  bootstrapOrg: async (orgId: string) => {
+    const [org, matrix, categories] = await Promise.all([
+      organizationService.getById(orgId),
+      organizationService.getRiskMatrix(orgId),
+      organizationService.listCategories(orgId),
+    ]);
+
+    return { org, matrix, categories };
+  },
 };

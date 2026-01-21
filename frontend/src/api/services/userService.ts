@@ -1,4 +1,5 @@
-import { userHttp } from "../http"; // תתאימי נתיב לפי המיקום האמיתי של http.ts
+// src/api/services/userService.ts
+import { userHttp } from "../http";
 import type {
   UserBoundary,
   CreateUserBoundary,
@@ -9,26 +10,7 @@ import type {
 
 const BASE_PATH = "/api/users";
 
-export interface UserFilters {
-  orgId?: string;
-  divisionId?: string;
-  departmentId?: string;
-}
-
-function buildQueryString(filters: UserFilters): string {
-  const params = new URLSearchParams();
-
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      params.append(key, String(value));
-    }
-  });
-
-  return params.toString();
-}
-
 export const userService = {
-  // CRUD
   create: async (data: CreateUserBoundary) =>
     (await userHttp.post<UserBoundary>(BASE_PATH, data)).data,
 
@@ -38,11 +20,8 @@ export const userService = {
   getByExternalAuthId: async (externalAuthId: string) =>
     (await userHttp.get<UserBoundary>(`${BASE_PATH}/by-external/${externalAuthId}`)).data,
 
-  list: async (filters: UserFilters = {}) => {
-    const queryString = buildQueryString(filters);
-    const endpoint = queryString ? `${BASE_PATH}?${queryString}` : BASE_PATH;
-    return (await userHttp.get<UserBoundary[]>(endpoint)).data;
-  },
+  list: async (params?: { orgId?: string; divisionId?: string; departmentId?: string }) =>
+    (await userHttp.get<UserBoundary[]>(BASE_PATH, { params })).data,
 
   update: async (id: string, data: UpdateUserBoundary) =>
     (await userHttp.patch<UserBoundary>(`${BASE_PATH}/${id}`, data)).data,
