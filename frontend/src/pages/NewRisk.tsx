@@ -15,12 +15,11 @@ import {
 
 import { cn } from "@/lib/utils";
 import {
-  LIKELIHOOD_LABELS,
-  IMPACT_LABELS,
   calculateScore,
   calculateSeverity,
   SEVERITY_LABELS,
 } from "@/types/risk";
+
 
 import {
   FileText,
@@ -39,6 +38,9 @@ import { riskService } from "@/api/services/riskService";
 import { organizationService } from "@/api/services/organizationService";
 import type { CategoryBoundary } from "@/api/types";
 import { DEFAULT_ORG_ID } from "@/api/config";
+import type { CreateRiskBoundary } from "@/api/types";
+import { useRiskMatrix } from "@/hooks/useRiskMatrix";
+
 
 const STEPS = [
   { id: 1, title: "תיאור הסיכון", icon: FileText },
@@ -66,6 +68,12 @@ export default function NewRisk() {
 
   const [categories, setCategories] = useState<CategoryBoundary[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const {
+    frequencyMap,
+    severityMap,
+    loading: matrixLoading,
+    error: matrixError,
+  } = useRiskMatrix(DEFAULT_ORG_ID);
 
   const score = calculateScore(formData.likelihood, formData.impact);
   const severity =
@@ -145,16 +153,13 @@ export default function NewRisk() {
 
       setSubmitting(true);
 
-      const payload = {
-        organizationId: DEFAULT_ORG_ID, // UUID חובה
+      const payload: CreateRiskBoundary = {
+        organizationId: DEFAULT_ORG_ID,
 
         title: formData.title,
         description: formData.description,
-
-        // חייב להיות GH1..GH21 לפי ה-Pattern בבקאנד
         categoryCode: formData.categoryCode,
 
-        // mapping: likelihood/impact => frequencyLevel/severityLevel
         frequencyLevel: formData.likelihood,
         severityLevel: formData.impact,
 
@@ -162,7 +167,8 @@ export default function NewRisk() {
         notes: formData.notes || undefined,
       };
 
-      await riskService.create(payload as any);
+      await riskService.create(payload);
+
 
       toast.success("הסיכון נוצר בהצלחה!", {
         description: `${formData.title} - ציון ${score}`,
@@ -191,6 +197,17 @@ export default function NewRisk() {
           מלא את הפרטים הבאים ליצירת סיכון חדש במערכת
         </p>
       </div>
+      {matrixError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+          לא הצלחתי לטעון מטריצת סיכונים לארגון. ({matrixError})
+        </div>
+      )}
+
+      {matrixLoading && (
+        <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+          טוען מטריצת סיכונים לארגון...
+        </div>
+      )}
 
       {/* Steps indicator */}
       <div className="card-elevated p-4">
@@ -365,13 +382,16 @@ export default function NewRisk() {
                   )}
                 >
                   <span className="text-3xl font-bold">{value}</span>
+
                   <span className="mt-2 text-sm font-medium">
-                    {
-                      LIKELIHOOD_LABELS[
-                        value as keyof typeof LIKELIHOOD_LABELS
-                      ]
-                    }
+                    {frequencyMap[value]?.label ?? `רמה ${value}`}
                   </span>
+
+                  {frequencyMap[value]?.description && (
+                    <span className="mt-1 text-xs text-muted-foreground text-center">
+                      {frequencyMap[value]?.description}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -403,8 +423,15 @@ export default function NewRisk() {
                 >
                   <span className="text-3xl font-bold">{value}</span>
                   <span className="mt-2 text-sm font-medium">
-                    {IMPACT_LABELS[value as keyof typeof IMPACT_LABELS]}
+                    {severityMap[value]?.label ?? `רמה ${value}`}
                   </span>
+
+                  {severityMap[value]?.description && (
+                    <span className="mt-1 text-xs text-muted-foreground text-center">
+                      {severityMap[value]?.description}
+                    </span>
+                  )}
+
                 </button>
               ))}
             </div>
@@ -479,20 +506,16 @@ export default function NewRisk() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">סבירות:</span>
                 <span className="font-medium">
-                  {
-                    LIKELIHOOD_LABELS[
-                      formData.likelihood as keyof typeof LIKELIHOOD_LABELS
-                    ]
-                  }{" "}
-                  ({formData.likelihood})
+                  {(frequencyMap[formData.likelihood]?.label ?? `רמה ${formData.likelihood}`)} ({formData.likelihood})
                 </span>
+
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">השפעה:</span>
                 <span className="font-medium">
-                  {IMPACT_LABELS[formData.impact as keyof typeof IMPACT_LABELS]}{" "}
-                  ({formData.impact})
+                  {(severityMap[formData.impact]?.label ?? `רמה ${formData.impact}`)} ({formData.impact})
                 </span>
+
               </div>
             </div>
 

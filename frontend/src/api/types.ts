@@ -1,9 +1,20 @@
 // Types matching your Spring Boot backend boundaries
 
 // ============ Enums ============
-export type RiskStatus = 'NEW' | 'IN_TREATMENT' | 'MITIGATED' | 'CLOSED' | 'ACCEPTED';
-export type RiskClassification = 'EXTREME_RED' | 'HIGH_ORANGE' | 'MEDIUM_YELLOW' | 'LOW_GREEN';
-export type TaskStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type RiskStatus =
+  | "DRAFT"
+  | "NEW"
+  | "IN_TREATMENT"
+  | "MITIGATED"
+  | "CLOSED"
+  | "ACCEPTED";
+
+export type RiskClassification =
+  | "EXTREME_RED"
+  | "HIGH_ORANGE"
+  | "MEDIUM_YELLOW"
+  | "LOW_GREEN";
+type TaskStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type UserRole = 'ADMIN' | 'EDITOR' | 'VIEWER' | 'RISK_MANAGER';
 
 // ============ Organization Boundaries ============
@@ -22,12 +33,12 @@ export interface OrganizationBoundary {
 
 export interface LevelDefinitionBoundary {
   level: number;
-  name: string;
+  label: string;
   description: string;
 }
 
 export interface RiskMatrixBoundary {
-  orgId: string;
+ // orgId: string;
   frequencyLevels: LevelDefinitionBoundary[];
   severityLevels: LevelDefinitionBoundary[];
 }
@@ -58,46 +69,51 @@ export interface UpdateCategoryBoundary {
 // ============ Risk Boundaries ============
 export interface CreateRiskBoundary {
   organizationId: string;
-  title: string;
-  description: string;
-  categoryCode: string;
-  severityLevel: number;   // 1-4
-  frequencyLevel: number;  // 1-4
-  location?: string;
-  notes?: string;
-
   divisionId?: string;
   departmentId?: string;
   riskManagerUserId?: string;
 
-  severityAfter?: number;
-  frequencyAfter?: number;
+  title: string;
+  categoryCode: string;
+  description?: string;
+
+  severityLevel: number;   // 1-4
+  frequencyLevel: number;  // 1-4
+
+  location?: string;
+  notes?: string;
 }
 
 export interface RiskBoundary {
   id: string;
-  orgId: string;
+  organizationId: string;
   divisionId?: string;
   departmentId?: string;
-  categoryCode?: string;
+  riskManagerUserId?: string;
+
   title: string;
+  categoryCode: string;
   description?: string;
-  frequency: number;
-  severity: number;
-  score: number; // frequency * severity
+
+  severityLevel: number;
+  frequencyLevel: number;
+
+  riskScore: number;
   classification: RiskClassification;
   status: RiskStatus;
-  riskManagerUserId?: string;
-  locationLat?: number;
-  locationLng?: number;
-  siteName?: string;
-  imageUrl?: string;
-  aiLikelihood?: number;
-  aiDescription?: string;
-  aiConfidence?: number;
+
+  location?: string;
+  notes?: string;
+
   createdAt: string;
   updatedAt: string;
+
+  severityAfter?: number;
+  frequencyAfter?: number;
+  scoreAfter?: number;
+  classificationAfter?: RiskClassification;
 }
+
 
 export interface UpdateRiskBoundary {
   title?: string;
