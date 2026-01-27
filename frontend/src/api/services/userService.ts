@@ -5,14 +5,20 @@ import type {
   CreateUserBoundary,
   UpdateUserBoundary,
   UpdateRoleBoundary,
-  AssignOrgUnitBoundary,
+  AssignOrgUnitBoundary, 
+  LoginRequest,
 } from "../types";
 
 const BASE_PATH = "/api/users";
+const AUTH_PATH = "/api/auth";
+
 
 export const userService = {
   create: async (data: CreateUserBoundary) =>
     (await userHttp.post<UserBoundary>(BASE_PATH, data)).data,
+
+  login: async (data: LoginRequest) =>
+  (await userHttp.post<UserBoundary>(`${AUTH_PATH}/login`, data)).data,
 
   getById: async (id: string) =>
     (await userHttp.get<UserBoundary>(`${BASE_PATH}/${id}`)).data,

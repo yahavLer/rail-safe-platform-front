@@ -13,6 +13,11 @@ import { UserPlus, Building2, ArrowRight, CheckCircle2 } from "lucide-react";
 import { userService } from "@/api/services/userService";
 
 const ORG_ID_KEY = "railsafe.orgId";
+type Role =
+  | "CHIEF_RISK_MANAGER"
+  | "DIVISION_RISK_MANAGER"
+  | "DEPARTMENT_RISK_MANAGER"
+  | "EMPLOYEE";
 
 export default function UserSignup() {
   const navigate = useNavigate();
@@ -25,20 +30,31 @@ export default function UserSignup() {
     lastName: "",
     email: "",
     password: "",
-    role: "ADMIN" as "ADMIN" | "RISK_MANAGER" | "EMPLOYEE",
+    divisionId: "",
+    departmentId: "",
+    role: "CHIEF_RISK_MANAGER" as Role,
   });
 
   useEffect(() => {
     const saved = localStorage.getItem(ORG_ID_KEY);
     if (saved) setOrgId(saved);
   }, []);
+  // -------- Role-based required fields --------
+  const needsDivision =
+    form.role === "DIVISION_RISK_MANAGER" || form.role === "DEPARTMENT_RISK_MANAGER";
+  const needsDepartment = form.role === "DEPARTMENT_RISK_MANAGER";
+
+  const divisionOk = !needsDivision || form.divisionId.trim().length > 0;
+  const departmentOk = !needsDepartment || form.departmentId.trim().length > 0;
 
   const canSubmit =
-    orgId &&
+    orgId.trim().length > 0 &&
     form.firstName.trim().length >= 2 &&
     form.lastName.trim().length >= 2 &&
     form.email.includes("@") &&
-    form.password.length >= 6;
+    form.password.length >= 6 &&
+    divisionOk &&
+    departmentOk;
 
   const onSubmit = async () => {
     if (!canSubmit) {
@@ -49,10 +65,20 @@ export default function UserSignup() {
     try {
       setSubmitting(true);
 
-      await userService.register({
-        organizationId: orgId,
-        ...form,
-      });
+      // we send division/department only if relevant (cleaner payload)
+      const payload: any = {
+        orgId,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        role: form.role,
+      };
+
+      if (needsDivision) payload.divisionId = form.divisionId.trim();
+      if (needsDepartment) payload.departmentId = form.departmentId.trim();
+
+      await userService.create(payload);
 
       toast.success("המשתמש נוצר בהצלחה!", {
         description: "כעת אפשר להתחבר למערכת",
@@ -67,6 +93,23 @@ export default function UserSignup() {
       setSubmitting(false);
     }
   };
+
+   const onRoleChange = (role: Role) => {
+    // When switching roles, clear irrelevant fields to avoid confusion
+    if (role === "CHIEF_RISK_MANAGER" || role === "EMPLOYEE") {
+      setForm({ ...form, role, divisionId: "", departmentId: "" });
+      return;
+    }
+
+    if (role === "DIVISION_RISK_MANAGER") {
+      setForm({ ...form, role, departmentId: "" }); // keep divisionId if already typed
+      return;
+    }
+
+    // DEPARTMENT_RISK_MANAGER
+    setForm({ ...form, role });
+  };
+
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -144,12 +187,45 @@ export default function UserSignup() {
               <SelectValue placeholder="בחר תפקיד" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ADMIN">Admin</SelectItem>
-              <SelectItem value="RISK_MANAGER">Risk Manager</SelectItem>
+              <SelectItem value="CHIEF_RISK_MANAGER">Chief Risk Manager</SelectItem>
+              <SelectItem value="DIVISION_RISK_MANAGER">Division Risk Manager</SelectItem>
+              <SelectItem value="DEPARTMENT_RISK_MANAGER">Department Risk Manager</SelectItem>
               <SelectItem value="EMPLOYEE">Employee</SelectItem>
             </SelectContent>
           </Select>
+           <p className="text-xs text-muted-foreground">
+            לפי התפקיד ייתכן שתידרשי להגדיר Division/Department.
+          </p>
         </div>
+
+        {/* Role-based fields */}
+        {needsDivision && (
+          <div className="space-y-2">
+            <Label>divisionId</Label>
+            <Input
+              value={form.divisionId}
+              onChange={(e) => setForm({ ...form, divisionId: e.target.value })}
+              placeholder="UUID של Division"
+            />
+            {!divisionOk && (
+              <p className="text-xs text-destructive">חובה להזין divisionId לתפקיד זה</p>
+            )}
+          </div>
+        )}
+
+        {needsDepartment && (
+          <div className="space-y-2">
+            <Label>departmentId</Label>
+            <Input
+              value={form.departmentId}
+              onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
+              placeholder="UUID של Department"
+            />
+            {!departmentOk && (
+              <p className="text-xs text-destructive">חובה להזין departmentId לתפקיד זה</p>
+            )}
+          </div>
+        )}
 
         <Button className="w-full" onClick={onSubmit} disabled={!canSubmit || submitting}>
           {submitting ? "יוצר משתמש..." : (

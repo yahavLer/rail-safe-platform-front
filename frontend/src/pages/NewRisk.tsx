@@ -154,7 +154,7 @@ export default function NewRisk() {
       setSubmitting(true);
 
       const payload: CreateRiskBoundary = {
-        organizationId: DEFAULT_ORG_ID,
+        orgId: DEFAULT_ORG_ID,
 
         title: formData.title,
         description: formData.description,

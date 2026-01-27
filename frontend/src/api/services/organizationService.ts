@@ -69,4 +69,7 @@ export const organizationService = {
 
     return { org, matrix, categories };
   },
+  
+  listOrganizations: async () =>
+  (await orgHttp.get<OrganizationBoundary[]>(`${BASE_PATH}`)).data,
 };

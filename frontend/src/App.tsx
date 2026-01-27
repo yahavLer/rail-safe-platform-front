@@ -10,7 +10,11 @@ import RisksList from "./pages/RisksList";
 import RiskDetail from "./pages/RiskDetail";
 import NewRisk from "./pages/NewRisk";
 import NotFound from "./pages/NotFound";
-import Setup from "./pages/Setup";
+import OrgSignup from "./pages/auth/OrgSignup";
+import UserSignup from "./pages/auth/UserSignup";
+import Login from "./pages/Login"; 
+import Bootstrap from "./pages/Bootstrap";
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,13 +33,14 @@ const App = () => (
         <Sonner position="top-center" />
         <BrowserRouter>
           <Routes>
-            {/* setup בלי layout אם את רוצה מסך "נקי" */}
-            <Route path="/setup" element={<Setup />} />
+            <Route path="/start" element={<Bootstrap />} />
 
-            {/* כל השאר עם layout */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup/org" element={<OrgSignup />} />
+            <Route path="/signup/user" element={<UserSignup />} />
+
             <Route element={<MainLayout />}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/setup" element={<Setup />} />  
               <Route path="/risks" element={<RisksList />} />
               <Route path="/risks/new" element={<NewRisk />} />
               <Route path="/risks/:id" element={<RiskDetail />} />

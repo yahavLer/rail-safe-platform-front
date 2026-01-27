@@ -14,13 +14,14 @@ export type RiskClassification =
   | "HIGH_ORANGE"
   | "MEDIUM_YELLOW"
   | "LOW_GREEN";
-type TaskStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
-export type UserRole = 'ADMIN' | 'EDITOR' | 'VIEWER' | 'RISK_MANAGER';
+export type TaskStatus = "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+export type UserRole = 'ADMIN' | 'CHIEF_RISK_MANAGER' | 'DIVISION_RISK_MANAGER' | 'DEPARTMENT_RISK_MANAGER' | 'EMPLOYEE';
 
 // ============ Organization Boundaries ============
 export interface CreateOrganizationBoundary {
   name: string;
-  description?: string;
+ // description?: string;
+  password: string;
 }
 
 export interface OrganizationBoundary {
@@ -58,17 +59,18 @@ export interface CategoryBoundary {
 export interface CreateCategoryBoundary {
   code: string;
   name: string;
-  description?: string;
+//  description?: string;
 }
 
 export interface UpdateCategoryBoundary {
   name?: string;
-  description?: string;
+  displayOrder?: number;
+  active?: boolean;
 }
 
 // ============ Risk Boundaries ============
 export interface CreateRiskBoundary {
-  organizationId: string;
+  orgId: string;
   divisionId?: string;
   departmentId?: string;
   riskManagerUserId?: string;
@@ -86,7 +88,7 @@ export interface CreateRiskBoundary {
 
 export interface RiskBoundary {
   id: string;
-  organizationId: string;
+  orgId: string;
   divisionId?: string;
   departmentId?: string;
   riskManagerUserId?: string;
@@ -118,14 +120,12 @@ export interface RiskBoundary {
 export interface UpdateRiskBoundary {
   title?: string;
   description?: string;
-  frequency?: number;
-  severity?: number;
+  frequencyLevel?: number;
+  severityLevel?: number;
   categoryCode?: string;
   riskManagerUserId?: string;
-  locationLat?: number;
-  locationLng?: number;
-  siteName?: string;
-  imageUrl?: string;
+  location?: string;
+  notes?: string;
 }
 
 export interface UpdateRiskStatusBoundary {
@@ -170,18 +170,21 @@ export interface UpdateTaskStatusBoundary {
 export interface CreateUserBoundary {
   externalAuthId: string;
   email: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   role: UserRole;
   orgId?: string;
   divisionId?: string;
   departmentId?: string;
+  password: string;
 }
 
 export interface UserBoundary {
   id: string;
   externalAuthId: string;
   email: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   role: UserRole;
   orgId?: string;
   divisionId?: string;
@@ -213,4 +216,9 @@ export interface RiskStats {
 
 export interface TaskStats {
   byStatus: Record<TaskStatus, number>;
+}
+export interface LoginRequest {
+  orgId: string;
+  email: string;
+  password: string;
 }

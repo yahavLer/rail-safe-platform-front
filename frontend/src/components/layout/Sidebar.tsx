@@ -16,7 +16,7 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'לוח בקרה' },
   { to: '/risks', icon: AlertTriangle, label: 'ניהול סיכונים' },
   { to: '/risks/new', icon: Plus, label: 'סיכון חדש' },
-  { to: '/setup', icon: UserPlus, label: 'הרשמה / יצירת ארגון' },
+  { to: '/signup/org', icon: UserPlus, label: 'הרשמה / יצירת ארגון' },
   { to: '/controls', icon: Shield, label: 'ספריית בקרות' },
   { to: '/reports', icon: FileText, label: 'דוחות' },
   { to: '/users', icon: Users, label: 'משתמשים' },

@@ -14,6 +14,7 @@ const ORG_ID_KEY = "railsafe.orgId";
 export default function OrgSignup() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async () => {
@@ -21,11 +22,15 @@ export default function OrgSignup() {
       toast.error("שם ארגון קצר מדי");
       return;
     }
+    if (password.length < 6) {
+      toast.error("סיסמה קצרה מדי", { description: "לפחות 6 תווים" });
+      return;
+    }
 
     try {
       setSubmitting(true);
 
-      const org = await organizationService.createOrganization({ name: name.trim() });
+      const org = await organizationService.create({ name: name.trim(), password });
 
       localStorage.setItem(ORG_ID_KEY, org.id);
       toast.success("הארגון נוצר!", { description: `ORG_ID: ${org.id}` });
@@ -56,7 +61,7 @@ export default function OrgSignup() {
           </div>
           <div>
             <p className="font-semibold">פרטי הארגון</p>
-            <p className="text-sm text-muted-foreground">רק שם כרגע (MVP)</p>
+            <p className="text-sm text-muted-foreground">שם + סיסמה (MVP)</p>
           </div>
         </div>
 
@@ -72,7 +77,19 @@ export default function OrgSignup() {
             אחרי יצירה תקבלי ORG_ID שנשמר אוטומטית ליצירת משתמשים.
           </p>
         </div>
-
+        <div className="space-y-2">
+          <Label htmlFor="orgPassword">סיסמת ארגון</Label>
+          <Input
+            id="orgPassword"
+            type="password"
+            placeholder="לפחות 6 תווים"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            הסיסמה נשמרת בבקאנד כ־hash ומשמשת בהמשך (אם תחליטי להשתמש בה לכניסת ארגון).
+          </p>
+        </div>
         <Button className="w-full" onClick={onSubmit} disabled={submitting}>
           {submitting ? "יוצר ארגון..." : (
             <>
