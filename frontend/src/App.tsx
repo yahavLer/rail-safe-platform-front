@@ -14,6 +14,8 @@ import OrgSignup from "./pages/auth/OrgSignup";
 import UserSignup from "./pages/auth/UserSignup";
 import Login from "./pages/Login"; 
 import Bootstrap from "./pages/Bootstrap";
+import RiskDefinitions from "./pages/chiefRiskManag/RiskDefinitions";
+
 
 
 const queryClient = new QueryClient({
@@ -31,14 +33,14 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner position="top-center" />
-        <BrowserRouter>
+        <BrowserRouter>      
           <Routes>
             <Route path="/start" element={<Bootstrap />} />
 
             <Route path="/login" element={<Login />} />
             <Route path="/signup/org" element={<OrgSignup />} />
             <Route path="/signup/user" element={<UserSignup />} />
-
+            <Route path="/risk-definitions" element={<RiskDefinitions />} />
             <Route element={<MainLayout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/risks" element={<RisksList />} />

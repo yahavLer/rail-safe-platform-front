@@ -86,9 +86,9 @@ export default function Login() {
 
       // Route by role
       if (user.role === "CHIEF_RISK_MANAGER") {
-        navigate("/");
+        navigate("/risk-definitions");
       } else {
-        navigate("/");
+        navigate("/dashboard");
       }
     } catch (e: any) {
       toast.error("התחברות נכשלה", {

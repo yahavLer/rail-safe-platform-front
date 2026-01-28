@@ -10,9 +10,15 @@ import {
   FileText,
   Train,
   UserPlus, 
+  Sliders,
 } from 'lucide-react';
 
-const navItems = [
+import { useEffect, useState } from 'react';
+import type { UserBoundary } from '@/api/types';
+
+const SESSION_KEY = "railsafe.session";
+
+const baseNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'לוח בקרה' },
   { to: '/risks', icon: AlertTriangle, label: 'ניהול סיכונים' },
   { to: '/risks/new', icon: Plus, label: 'סיכון חדש' },
@@ -23,7 +29,40 @@ const navItems = [
   { to: '/settings', icon: Settings, label: 'הגדרות' },
 ];
 
+const chiefRiskManagerItem = {
+  to: '/risk-definitions',
+  icon: Sliders,
+  label: 'הגדרות סיכונים',
+  roleRequired: 'CHIEF_RISK_MANAGER'
+};
+
 export function Sidebar() {
+  const [currentUser, setCurrentUser] = useState<UserBoundary | null>(null);
+  const [navItems, setNavItems] = useState(baseNavItems );
+
+  useEffect(() => {
+    // Load user from session
+    const sessionStr = localStorage.getItem(SESSION_KEY);
+    if (sessionStr) {
+      try {
+        const user: UserBoundary = JSON.parse(sessionStr);
+        setCurrentUser(user);
+
+        // If user is CHIEF_RISK_MANAGER, add the risk definitions item
+        if (user.role === 'CHIEF_RISK_MANAGER') {
+          // Insert after "ניהול סיכונים" (index 2, after /, /risks, /risks/new)
+          const updatedItems = [
+            ...baseNavItems .slice(0, 3),
+            chiefRiskManagerItem,
+            ...baseNavItems .slice(3),
+          ];
+          setNavItems(updatedItems);
+        }
+      } catch (e) {
+        console.error('Failed to parse user session:', e);
+      }
+    }
+  }, []);
   return (
     <aside className="fixed right-0 top-0 z-40 h-screen w-64 sidebar-gradient">
       <div className="flex h-full flex-col">
@@ -56,7 +95,7 @@ export function Sidebar() {
                 )
               }
             >
-              <item.icon className="h-5 w-5" />
+              {item.icon && <item.icon className="h-5 w-5" />}
               <span>{item.label}</span>
             </NavLink>
           ))}
@@ -66,11 +105,21 @@ export function Sidebar() {
         <div className="border-t border-sidebar-border p-4">
           <div className="flex items-center gap-3 rounded-lg bg-sidebar-accent p-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-primary text-sm font-bold text-sidebar-primary-foreground">
-              יכ
+              {currentUser?.firstName?.[0] || currentUser?.lastName?.[0] || 'U'}
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-sidebar-foreground">יוסי כהן</p>
-              <p className="text-xs text-sidebar-foreground/60">מנהל מערכת</p>
+              <p className="text-sm font-medium text-sidebar-foreground">
+                {currentUser?.firstName && currentUser?.lastName 
+                  ? `${currentUser.firstName} ${currentUser.lastName}`
+                  : currentUser?.email || 'משתמש'}
+              </p>
+              <p className="text-xs text-sidebar-foreground/60">
+                {currentUser?.role === 'CHIEF_RISK_MANAGER' && 'מנהל סיכונים ראשי'}
+                {currentUser?.role === 'DIVISION_RISK_MANAGER' && 'מנהל סיכונים מחלקתי'}
+                {currentUser?.role === 'DEPARTMENT_RISK_MANAGER' && 'מנהל סיכונים מחלקתי'}
+                {currentUser?.role === 'EMPLOYEE' && 'עובד'}
+                {!currentUser?.role && 'משתמש'}
+              </p>
             </div>
           </div>
         </div>

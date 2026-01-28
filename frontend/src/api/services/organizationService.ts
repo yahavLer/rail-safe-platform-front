@@ -1,3 +1,4 @@
+import axios from "axios";
 import { orgHttp } from "../http";
 import type {
   OrganizationBoundary,
@@ -31,7 +32,12 @@ export const organizationService = {
   ) =>
     (await orgHttp.patch<LevelDefinitionBoundary>(
       `${BASE_PATH}/${orgId}/risk-matrix/frequency/${level}`,
-      data
+      data,
+      {
+        headers: {
+          'Content-Type': 'application/json', 
+        },
+      }
     )).data,
 
   updateSeverityDescription: async (
@@ -41,7 +47,12 @@ export const organizationService = {
   ) =>
     (await orgHttp.patch<LevelDefinitionBoundary>(
       `${BASE_PATH}/${orgId}/risk-matrix/severity/${level}`,
-      data
+      data,
+      {
+        headers: {
+          'Content-Type': 'application/json', 
+        },
+      }
     )).data,
 
   // Categories
@@ -54,7 +65,12 @@ export const organizationService = {
   updateCategory: async (orgId: string, categoryId: string, data: UpdateCategoryBoundary) =>
     (await orgHttp.patch<CategoryBoundary>(
       `${BASE_PATH}/${orgId}/categories/${categoryId}`,
-      data
+      data,
+      {
+        headers: {
+          'Content-Type': 'application/json', // ← FIX: הוספת header מפורש
+        },
+      }
     )).data,
 
   deleteCategory: async (orgId: string, categoryId: string) =>

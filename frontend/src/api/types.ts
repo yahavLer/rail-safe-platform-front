@@ -33,8 +33,8 @@ export interface OrganizationBoundary {
 }
 
 export interface LevelDefinitionBoundary {
-  level: number;
-  label: string;
+  level: number; // 1-4
+  label: string; // e.g., "נדיר", "מזערי"
   description: string;
 }
 
@@ -50,8 +50,8 @@ export interface UpdateDescriptionBoundary {
 
 export interface CategoryBoundary {
   id: string;
-  code: string;
-  name: string;
+  code: string; // e.g., "GH1"
+  name: string; // e.g., "חשמל"
   displayOrder: number;
   active: boolean;
 }
@@ -60,6 +60,7 @@ export interface CreateCategoryBoundary {
   code: string;
   name: string;
 //  description?: string;
+  //displayOrder: number;
 }
 
 export interface UpdateCategoryBoundary {
