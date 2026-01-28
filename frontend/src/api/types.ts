@@ -14,7 +14,7 @@ export type RiskClassification =
   | "HIGH_ORANGE"
   | "MEDIUM_YELLOW"
   | "LOW_GREEN";
-export type TaskStatus = "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "CANCELED";
 export type UserRole = 'ADMIN' | 'CHIEF_RISK_MANAGER' | 'DIVISION_RISK_MANAGER' | 'DEPARTMENT_RISK_MANAGER' | 'EMPLOYEE';
 
 // ============ Organization Boundaries ============
@@ -135,24 +135,24 @@ export interface UpdateRiskStatusBoundary {
 
 // ============ Task Boundaries ============
 export interface CreateTaskBoundary {
-  orgId: string;
+  organizationId: string;   
   riskId: string;
   title: string;
-  description?: string;
+  description: string;      
   assigneeUserId?: string;
   dueDate?: string;
 }
 
 export interface TaskBoundary {
   id: string;
-  orgId: string;
+  organizationId: string;   
   riskId: string;
   title: string;
-  description?: string;
+  description: string;      
   status: TaskStatus;
   assigneeUserId?: string;
   dueDate?: string;
-  completedAt?: string;
+  completedAt?: string;     // אם אין בבאק כרגע - אפשר להשאיר, לא שובר
   createdAt: string;
   updatedAt: string;
 }
