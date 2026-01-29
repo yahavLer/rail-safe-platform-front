@@ -71,7 +71,7 @@ export interface UpdateCategoryBoundary {
 
 // ============ Risk Boundaries ============
 export interface CreateRiskBoundary {
-  orgId: string;
+  organizationId: string;
   divisionId?: string;
   departmentId?: string;
   riskManagerUserId?: string;

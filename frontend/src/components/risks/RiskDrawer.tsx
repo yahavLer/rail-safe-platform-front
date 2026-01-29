@@ -8,6 +8,17 @@ import { taskService } from "@/api/services/taskService";
 import { DEFAULT_ORG_ID } from "@/api/config";
 import type { RiskBoundary, TaskBoundary, TaskStatus } from "@/api/types";
 
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+
 function mapClassificationToUiSeverity(c?: string) {
   switch (c) {
     case "EXTREME_RED": return "CRITICAL";
@@ -48,6 +59,61 @@ export function RiskDrawer({
   const [risk, setRisk] = useState<RiskBoundary | null>(null);
   const [tasks, setTasks] = useState<TaskBoundary[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  TODO: "לביצוע",
+  IN_PROGRESS: "בתהליך",
+  DONE: "בוצע",
+  CANCELED: "בוטל",
+  };
+
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [taskForm, setTaskForm] = useState({
+    title: "",
+    description: "",
+    assigneeUserId: "",
+    dueDate: "", // yyyy-mm-dd or datetime-local
+  });
+
+  function toInstantIso(value: string) {
+    if (!value) return undefined;
+    // אם זה רק תאריך (yyyy-mm-dd) -> נשגר כ-ISO בתחילת היום
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(`${value}T00:00:00`).toISOString();
+    }
+    // אם זה datetime-local (yyyy-mm-ddThh:mm)
+    return new Date(value).toISOString();
+  }
+
+  async function createTask() {
+    if (!riskId || !DEFAULT_ORG_ID) return;
+
+    try {
+      const created = await taskService.create({
+        organizationId: DEFAULT_ORG_ID,
+        riskId,
+        title: taskForm.title.trim(),
+        description: taskForm.description.trim(),
+        assigneeUserId: taskForm.assigneeUserId.trim() || undefined,
+        dueDate: toInstantIso(taskForm.dueDate),
+      });
+
+      setTasks(prev => [created, ...prev]);
+      setCreateTaskOpen(false);
+      setTaskForm({ title: "", description: "", assigneeUserId: "", dueDate: "" });
+    } catch (e) {
+      console.error("createTask failed", e);
+    }
+  }
+
+  async function changeStatus(taskId: string, status: TaskStatus) {
+    try {
+      const updated = await taskService.updateStatus(taskId, { status });
+      setTasks(prev => prev.map(t => (t.id === taskId ? updated : t)));
+    } catch (e) {
+      console.error("changeStatus failed", e);
+    }
+  }
 
   useEffect(() => {
     if (!open || !riskId || !DEFAULT_ORG_ID) return;
@@ -176,9 +242,16 @@ export function RiskDrawer({
                   <div className="text-sm text-muted-foreground">
                     (בהמשך נחבר שמות משתמשים במקום UUID)
                   </div>
-                  <Button variant="outline" onClick={exportTasks} disabled={!tasks.length}>
-                    ייצוא משימות
-                  </Button>
+
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setCreateTaskOpen(true)}>
+                      הוסף משימה
+                    </Button>
+
+                    <Button variant="outline" onClick={exportTasks} disabled={!tasks.length}>
+                      ייצוא משימות
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="rounded-xl border divide-y">
@@ -186,18 +259,32 @@ export function RiskDrawer({
                     <div className="p-4 text-sm text-muted-foreground">אין עדיין משימות לסיכון הזה.</div>
                   ) : (
                     tasks.map(t => (
-                      <div key={t.id} className="p-4 flex items-center justify-between gap-3">
+                      <div className="p-4 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <div className="font-medium truncate">{t.title}</div>
                           <div className="text-xs text-muted-foreground">
-                            סטטוס: {t.status} • אחראי: {t.assigneeUserId ?? "לא שויך"}
+                            סטטוס: {TASK_STATUS_LABELS[t.status]} • אחראי: {t.assigneeUserId ?? "לא שויך"}
                           </div>
                         </div>
 
-                        {t.status !== "DONE" && (
-                          <Button onClick={() => markDone(t.id)}>סמן בוצע</Button>
-                        )}
+                        <div className="w-[160px]">
+                          <Select
+                            value={t.status}
+                            onValueChange={(v) => changeStatus(t.id, v as TaskStatus)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="TODO">לביצוע</SelectItem>
+                              <SelectItem value="IN_PROGRESS">בתהליך</SelectItem>
+                              <SelectItem value="DONE">בוצע</SelectItem>
+                              <SelectItem value="CANCELED">בוטל</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
+
                     ))
                   )}
                 </div>

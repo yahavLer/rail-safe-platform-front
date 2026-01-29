@@ -41,6 +41,8 @@ import { DEFAULT_ORG_ID } from "@/api/config";
 import type { CreateRiskBoundary } from "@/api/types";
 import { useRiskMatrix } from "@/hooks/useRiskMatrix";
 
+import { taskService } from "@/api/services/taskService";
+import type { CreateTaskBoundary } from "@/api/types";
 
 const STEPS = [
   { id: 1, title: "תיאור הסיכון", icon: FileText },
@@ -65,6 +67,36 @@ export default function NewRisk() {
     impact: 0,
     notes: "",
   });
+
+  const [draftTasks, setDraftTasks] = useState<
+  Array<Omit<CreateTaskBoundary, "organizationId" | "riskId">>>([]);
+
+  const [draftTaskForm, setDraftTaskForm] = useState({
+    title: "",
+    description: "",
+    assigneeUserId: "",
+    dueDate: "", // date
+  });
+
+  function addDraftTask() {
+    if (!draftTaskForm.title.trim() || !draftTaskForm.description.trim()) return;
+
+    setDraftTasks(prev => [
+      ...prev,
+      {
+        title: draftTaskForm.title.trim(),
+        description: draftTaskForm.description.trim(),
+        assigneeUserId: draftTaskForm.assigneeUserId.trim() || undefined,
+        dueDate: draftTaskForm.dueDate ? new Date(`${draftTaskForm.dueDate}T00:00:00`).toISOString() : undefined,
+      }
+    ]);
+
+    setDraftTaskForm({ title: "", description: "", assigneeUserId: "", dueDate: "" });
+  }
+
+  function removeDraftTask(idx: number) {
+    setDraftTasks(prev => prev.filter((_, i) => i !== idx));
+  }
 
   const [categories, setCategories] = useState<CategoryBoundary[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
@@ -154,7 +186,7 @@ export default function NewRisk() {
       setSubmitting(true);
 
       const payload: CreateRiskBoundary = {
-        orgId: DEFAULT_ORG_ID,
+        organizationId: DEFAULT_ORG_ID,
 
         title: formData.title,
         description: formData.description,
@@ -167,7 +199,31 @@ export default function NewRisk() {
         notes: formData.notes || undefined,
       };
 
-      await riskService.create(payload);
+      //await riskService.create(payload);
+      const createdRisk = await riskService.create(payload);
+
+      if (draftTasks.length > 0) {
+        try {
+          await Promise.all(
+            draftTasks.map((t) =>
+              taskService.create({
+                organizationId: DEFAULT_ORG_ID,
+                riskId: createdRisk.id,
+                title: t.title,
+                description: t.description,
+                assigneeUserId: t.assigneeUserId,
+                dueDate: t.dueDate,
+              })
+            )
+          );
+        } catch (e) {
+          // לא מפילים את כל יצירת הסיכון על משימות – רק מודיעים
+          toast.error("הסיכון נוצר, אבל חלק מהמשימות לא נשמרו", {
+            description: "נסי להוסיף את המיטיגציות מתוך פירוט הסיכון.",
+          });
+        }
+      }
+
 
 
       toast.success("הסיכון נוצר בהצלחה!", {
@@ -532,6 +588,85 @@ export default function NewRisk() {
                 rows={3}
               />
             </div>
+            <div className="rounded-xl border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-semibold">מיטיגציות (משימות)</div>
+                  <div className="text-sm text-muted-foreground">לא חובה — אפשר גם אחרי יצירת הסיכון</div>
+                </div>
+                <div className="text-sm text-muted-foreground">סה״כ: {draftTasks.length}</div>
+              </div>
+
+              <div className="grid gap-3">
+                <div className="space-y-1">
+                  <Label>כותרת</Label>
+                  <Input
+                    value={draftTaskForm.title}
+                    onChange={(e) => setDraftTaskForm(s => ({ ...s, title: e.target.value }))}
+                    placeholder="לדוגמה: הצבת גידור זמני"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>תיאור</Label>
+                  <Textarea
+                    value={draftTaskForm.description}
+                    onChange={(e) => setDraftTaskForm(s => ({ ...s, description: e.target.value }))}
+                    rows={3}
+                    placeholder="מה בדיוק עושים?"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>אחראי (UserId)</Label>
+                    <Input
+                      value={draftTaskForm.assigneeUserId}
+                      onChange={(e) => setDraftTaskForm(s => ({ ...s, assigneeUserId: e.target.value }))}
+                      placeholder="אופציונלי"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>תאריך יעד</Label>
+                    <Input
+                      type="date"
+                      value={draftTaskForm.dueDate}
+                      onChange={(e) => setDraftTaskForm(s => ({ ...s, dueDate: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addDraftTask}
+                  disabled={!draftTaskForm.title.trim() || !draftTaskForm.description.trim()}
+                >
+                  הוסף משימה לרשימה
+                </Button>
+              </div>
+
+              <div className="rounded-lg border divide-y">
+                {draftTasks.length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground">אין משימות שהוגדרו עדיין.</div>
+                ) : (
+                  draftTasks.map((t, idx) => (
+                    <div key={idx} className="p-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{t.title}</div>
+                        <div className="text-xs text-muted-foreground truncate">{t.description}</div>
+                      </div>
+                      <Button type="button" variant="ghost" onClick={() => removeDraftTask(idx)}>
+                        הסר
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+
           </div>
         )}
       </div>
