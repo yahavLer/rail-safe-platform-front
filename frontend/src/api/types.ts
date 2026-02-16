@@ -190,12 +190,16 @@ export interface UserBoundary {
   orgId?: string;
   divisionId?: string;
   departmentId?: string;
+  active: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface UpdateUserBoundary {
+  firstName?: string;
+  lastName?: string;
   email?: string;
+  active?: boolean;
   fullName?: string;
 }
 

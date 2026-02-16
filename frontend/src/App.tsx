@@ -15,7 +15,10 @@ import UserSignup from "./pages/auth/UserSignup";
 import Login from "./pages/Login"; 
 import Bootstrap from "./pages/Bootstrap";
 import RiskDefinitions from "./pages/chiefRiskManag/RiskDefinitions";
-
+import ReportsPage from "./pages/ReportsPage";
+import SettingsPage from "./pages/SettingsPage";
+import UsersPage from "./pages/UsersPage";
+import ControlsLibraryPage  from "./pages/ControlsLibraryPage";
 
 
 const queryClient = new QueryClient({
@@ -46,6 +49,10 @@ const App = () => (
               <Route path="/risks" element={<RisksList />} />
               <Route path="/risks/new" element={<NewRisk />} />
               <Route path="/risks/:id" element={<RiskDetail />} />
+              <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/controls" element={<ControlsLibraryPage />} />
+              <Route path="/users" element={<UsersPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
