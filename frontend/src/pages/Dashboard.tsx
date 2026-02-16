@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom"; 
 
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { RiskMatrix } from "@/components/dashboard/RiskMatrix";
@@ -51,6 +52,7 @@ function mapClassificationToUiSeverity(
 }
 
 export default function Dashboard() {
+  const nav = useNavigate();
   const [uiRisks, setUiRisks] = useState<UiRisk[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -124,9 +126,20 @@ export default function Dashboard() {
     };
   }, [uiRisks, byStatus, byClassification]);
 
+  function goToRisks(filters?: Record<string, string | number | undefined | null>) {
+    const qs = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([k, v]) => {
+        if (v === undefined || v === null || v === "") return;
+        qs.set(k, String(v));
+      });
+    }
+    const suffix = qs.toString();
+    nav(suffix ? `/risks?${suffix}` : "/risks");
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="animate-fade-in">
         <h1 className="text-3xl font-bold text-foreground">לוח בקרה</h1>
         <p className="mt-1 text-muted-foreground">
@@ -137,24 +150,55 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Stats Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <StatsCard title="סה״כ סיכונים" value={stats.totalRisks} icon={Shield} variant="default" />
-        <StatsCard title="קריטיים" value={stats.criticalRisks} icon={AlertCircle} variant="critical" />
-        <StatsCard title="גבוהים" value={stats.highRisks} icon={AlertTriangle} variant="high" />
-        <StatsCard title="בטיפול" value={stats.inProgressRisks} icon={Clock} variant="medium" />
+        <StatsCard
+          title="סה״כ סיכונים"
+          value={stats.totalRisks}
+          icon={Shield}
+          variant="default"
+          onClick={() => goToRisks()}
+        />
+        <StatsCard
+          title="קריטיים"
+          value={stats.criticalRisks}
+          icon={AlertCircle}
+          variant="critical"
+          onClick={() => goToRisks({ classification: "EXTREME_RED" })}
+        />
+        <StatsCard
+          title="גבוהים"
+          value={stats.highRisks}
+          icon={AlertTriangle}
+          variant="high"
+          onClick={() => goToRisks({ classification: "HIGH_ORANGE" })}
+        />
+        <StatsCard
+          title="בטיפול"
+          value={stats.inProgressRisks}
+          icon={Clock}
+          variant="medium"
+          onClick={() => goToRisks({ status: "IN_TREATMENT" })}
+        />
         <StatsCard
           title="חריגי SLA"
           value={stats.overdueRisks}
           icon={TrendingDown}
           variant={stats.overdueRisks > 0 ? "critical" : "low"}
         />
-        <StatsCard title="הופחתו החודש" value={stats.mitigatedThisMonth} icon={CheckCircle} variant="low" />
+        <StatsCard
+          title="הופחתו החודש"
+          value={stats.mitigatedThisMonth}
+          icon={CheckCircle}
+          variant="low"
+          onClick={() => goToRisks({ status: "MITIGATED" })}
+        />
       </div>
 
-      {/* Main content */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <RiskMatrix risks={uiRisks as any} />
+        <RiskMatrix
+          risks={uiRisks as any}
+          onCellClick={(likelihood, impact) => goToRisks({ score: likelihood * impact })} // ✅ תא במטריצה
+        />
         <RecentRisks risks={uiRisks as any} />
       </div>
     </div>

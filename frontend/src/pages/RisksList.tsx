@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { riskService } from "@/api/services/riskService";
 import { DEFAULT_ORG_ID } from "@/api/config";
@@ -7,11 +7,9 @@ import type { RiskBoundary, RiskClassification } from "@/api/types";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { RiskDrawer } from "@/components/risks/RiskDrawer";
-
-// אם יש לך כבר רכיבים קיימים לפילטרים/טבלה – תשאירי אותם במקום,
-// המטרה פה: להחזיר layout + להוסיף Drawer בלי לשבור.
-import { RiskTable } from "@/components/risks/RiskTable"; // <-- אם זה השם אצלך
+import { RiskTable } from "@/components/risks/RiskTable";
 
 function toUiSeverity(c: RiskClassification) {
   switch (c) {
@@ -24,16 +22,35 @@ function toUiSeverity(c: RiskClassification) {
 
 export default function RisksList() {
   const nav = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [risks, setRisks] = useState<RiskBoundary[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedRiskId, setSelectedRiskId] = useState<string | null>(null);
 
-  // פילטרים בסיסיים (אם כבר יש לך פילטרים קיימים – תשאירי את שלך)
   const [search, setSearch] = useState("");
+
+  // ✅ פילטרים מה-URL
+  const [classificationFilter, setClassificationFilter] = useState<RiskClassification | null>(null);
+  const [scoreFilter, setScoreFilter] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+
+  const isRiskClassification = (v: string): v is RiskClassification =>
+    ["EXTREME_RED", "HIGH_ORANGE", "MEDIUM_YELLOW", "LOW_GREEN"].includes(v);
+
+  useEffect(() => {
+    const c = searchParams.get("classification");
+    setClassificationFilter(c && isRiskClassification(c) ? c : null);
+
+    const s = searchParams.get("score");
+    const n = s ? Number(s) : NaN;
+    setScoreFilter(Number.isFinite(n) ? n : null);
+
+    const st = searchParams.get("status");
+    setStatusFilter(st ? st : null);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!DEFAULT_ORG_ID) return;
@@ -52,14 +69,25 @@ export default function RisksList() {
   }, []);
 
   const filteredRisks = useMemo(() => {
+    let list = risks;
+
+    if (classificationFilter) list = list.filter(r => r.classification === classificationFilter);
+    if (scoreFilter !== null) list = list.filter(r => r.riskScore === scoreFilter);
+    if (statusFilter) list = list.filter(r => r.status === statusFilter);
+
     const q = search.trim().toLowerCase();
-    if (!q) return risks;
-    return risks.filter(r =>
+    if (!q) return list;
+
+    return list.filter(r =>
       (r.title ?? "").toLowerCase().includes(q) ||
       (r.description ?? "").toLowerCase().includes(q) ||
       (r.categoryCode ?? "").toLowerCase().includes(q)
     );
-  }, [risks, search]);
+  }, [risks, search, classificationFilter, scoreFilter, statusFilter]);
+
+  function clearUrlFilters() {
+    setSearchParams({});
+  }
 
   function openRiskDrawer(riskId: string) {
     setSelectedRiskId(riskId);
@@ -68,7 +96,6 @@ export default function RisksList() {
 
   return (
     <div className="space-y-4">
-      {/* Header + Actions כמו בתמונה */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold">ניהול סיכונים</h1>
@@ -79,23 +106,14 @@ export default function RisksList() {
         </div>
 
         <div className="flex gap-2">
-          <Button onClick={() => nav("/risks/new")}>
-            + סיכון חדש
-          </Button>
-
-          <Button variant="outline" onClick={() => {
-            // אם יש לך כבר export קיים – השאירי אותו
-            // כאן רק placeholder
-            console.log("export CSV");
-          }}>
+          <Button onClick={() => nav("/risks/new")}>+ סיכון חדש</Button>
+          <Button variant="outline" onClick={() => console.log("export CSV")}>
             יצוא CSV
           </Button>
         </div>
       </div>
 
-      {/* Filters Row כמו בתמונה */}
       <div className="flex flex-wrap gap-2 items-center rounded-xl border p-3">
-        {/* אם יש לך Select-ים קיימים, פשוט תחזירי אותם כאן */}
         <div className="flex-1 min-w-[240px]">
           <Input
             value={search}
@@ -103,16 +121,31 @@ export default function RisksList() {
             placeholder="חיפוש סיכונים..."
           />
         </div>
+
+        {(classificationFilter || scoreFilter !== null || statusFilter) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {classificationFilter && (
+              <Badge variant="outline">סיווג: {toUiSeverity(classificationFilter)}</Badge>
+            )}
+            {scoreFilter !== null && (
+              <Badge variant="outline">מדד: {scoreFilter}</Badge>
+            )}
+            {statusFilter && (
+              <Badge variant="outline">סטטוס: {statusFilter}</Badge>
+            )}
+            <Button variant="ghost" size="sm" onClick={clearUrlFilters}>
+              נקה סינון
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Table */}
       <RiskTable
         risks={filteredRisks}
         onViewRisk={(riskId: string) => openRiskDrawer(riskId)}
         onEditRisk={(riskId: string) => nav(`/risks/${riskId}/edit`)}
       />
-      
-      {/* Drawer */}
+
       <RiskDrawer
         open={drawerOpen}
         onOpenChange={setDrawerOpen}

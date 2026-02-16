@@ -11,6 +11,9 @@ interface StatsCardProps {
     isPositive: boolean;
   };
   variant?: 'default' | 'critical' | 'high' | 'medium' | 'low';
+
+  onClick?: () => void;
+  ariaLabel?: string;
 }
 
 const variantStyles = {
@@ -36,41 +39,62 @@ export function StatsCard({
   icon: Icon,
   trend,
   variant = 'default',
+
+  onClick,
+  ariaLabel,
 }: StatsCardProps) {
-  return (
-    <div
-      className={cn(
-        'rounded-xl border p-6 shadow-sm transition-all duration-300 hover:shadow-md animate-fade-in',
-        variantStyles[variant]
-      )}
-    >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight">{value}</p>
-          {subtitle && (
-            <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-          )}
-          {trend && (
-            <p
-              className={cn(
-                'mt-2 text-sm font-medium',
-                trend.isPositive ? 'text-risk-low' : 'text-risk-critical'
-              )}
-            >
-              {trend.isPositive ? '↓' : '↑'} {Math.abs(trend.value)}% מהחודש שעבר
-            </p>
-          )}
-        </div>
-        <div
-          className={cn(
-            'flex h-12 w-12 items-center justify-center rounded-lg',
-            iconVariantStyles[variant]
-          )}
-        >
-          <Icon className="h-6 w-6" />
-        </div>
+  const clickable = typeof onClick === 'function';
+
+  const baseClassName = cn(
+    'rounded-xl border p-6 shadow-sm transition-all duration-300 hover:shadow-md animate-fade-in text-right',
+    variantStyles[variant],
+    clickable &&
+      'cursor-pointer hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40'
+  );
+
+  const content = (
+    <div className="flex items-start justify-between">
+      <div>
+        <p className="text-sm font-medium text-muted-foreground">{title}</p>
+        <p className="mt-2 text-3xl font-bold tracking-tight">{value}</p>
+        {subtitle && (
+          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+        )}
+        {trend && (
+          <p
+            className={cn(
+              'mt-2 text-sm font-medium',
+              trend.isPositive ? 'text-risk-low' : 'text-risk-critical'
+            )}
+          >
+            {trend.isPositive ? '↓' : '↑'} {Math.abs(trend.value)}% מהחודש שעבר
+          </p>
+        )}
+      </div>
+
+      <div
+        className={cn(
+          'flex h-12 w-12 items-center justify-center rounded-lg',
+          iconVariantStyles[variant]
+        )}
+      >
+        <Icon className="h-6 w-6" />
       </div>
     </div>
   );
+
+  if (clickable) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={ariaLabel ?? title}
+        className={baseClassName}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={baseClassName}>{content}</div>;
 }

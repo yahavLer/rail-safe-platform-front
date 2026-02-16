@@ -305,6 +305,68 @@ export function RiskDrawer({
                 </div>
               </TabsContent>
             </Tabs>
+            <Dialog open={createTaskOpen} onOpenChange={setCreateTaskOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>הוספת מיטיגציה (משימה)</DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label>כותרת</Label>
+                    <Input
+                      value={taskForm.title}
+                      onChange={(e) => setTaskForm(s => ({ ...s, title: e.target.value }))}
+                      placeholder="לדוגמה: ניקוי אזור הסיכון / הצבת שילוט"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>תיאור</Label>
+                    <Textarea
+                      value={taskForm.description}
+                      onChange={(e) => setTaskForm(s => ({ ...s, description: e.target.value }))}
+                      placeholder="מה עושים בפועל כדי להפחית סיכון?"
+                      rows={4}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>אחראי (UserId)</Label>
+                    <Input
+                      value={taskForm.assigneeUserId}
+                      onChange={(e) => setTaskForm(s => ({ ...s, assigneeUserId: e.target.value }))}
+                      placeholder="אופציונלי"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>תאריך יעד</Label>
+                    <Input
+                      type="date"
+                      value={taskForm.dueDate}
+                      onChange={(e) => setTaskForm(s => ({ ...s, dueDate: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter className="gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCreateTaskOpen(false)}
+                  >
+                    ביטול
+                  </Button>
+                  <Button
+                    onClick={createTask}
+                    disabled={!taskForm.title.trim() || !taskForm.description.trim()}
+                  >
+                    שמור משימה
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
           </div>
         )}
       </SheetContent>
