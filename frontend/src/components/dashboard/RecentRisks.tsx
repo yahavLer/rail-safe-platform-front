@@ -1,3 +1,4 @@
+// RecentRisks.tsx
 import { Link } from 'react-router-dom';
 import { Risk, STATUS_LABELS, SEVERITY_LABELS } from '@/types/risk';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +9,7 @@ import { he } from 'date-fns/locale';
 
 interface RecentRisksProps {
   risks: Risk[];
+  onRiskClick?: (riskId: string) => void;
 }
 
 const severityBadgeStyles = {
@@ -22,9 +24,11 @@ const statusBadgeStyles = {
   IN_PROGRESS: 'bg-status-in-progress/10 text-status-in-progress border-status-in-progress/20',
   MITIGATED: 'bg-status-mitigated/10 text-status-mitigated border-status-mitigated/20',
   CLOSED: 'bg-status-closed/10 text-status-closed border-status-closed/20',
+  DRAFT: "bg-muted/30 text-muted-foreground border-muted/40",
+  ACCEPTED: "bg-muted/30 text-muted-foreground border-muted/40",
 };
 
-export function RecentRisks({ risks }: RecentRisksProps) {
+export function RecentRisks({ risks, onRiskClick }: RecentRisksProps) {
   const recentRisks = risks
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
@@ -43,57 +47,79 @@ export function RecentRisks({ risks }: RecentRisksProps) {
       </div>
 
       <div className="space-y-4">
-        {recentRisks.map((risk, index) => (
-          <Link
-            key={risk.id}
-            to={`/risks/${risk.id}`}
-            className={cn(
-              'block rounded-lg border border-border bg-background p-4 transition-all duration-200 hover:border-primary/30 hover:shadow-md',
-              'animate-slide-up'
-            )}
-            style={{ animationDelay: `${index * 100}ms` }}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <h4 className="font-medium text-foreground line-clamp-1">
-                  {risk.title}
-                </h4>
-                <p className="mt-1 text-sm text-muted-foreground line-clamp-1">
-                  {risk.description}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                  {risk.siteName && (
+        {recentRisks.map((risk, index) => {
+          const Card = (
+            <div
+              className={cn(
+                "block rounded-lg border border-border bg-background p-4 transition-all duration-200 hover:border-primary/30 hover:shadow-md",
+                "animate-slide-up"
+              )}
+              style={{ animationDelay: `${index * 100}ms` }}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-foreground line-clamp-1">{risk.title}</h4>
+                  <p className="mt-1 text-sm text-muted-foreground line-clamp-1">
+                    {risk.description}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    {risk.siteName && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {risk.siteName}
+                      </span>
+                    )}
                     <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {risk.siteName}
+                      <Clock className="h-3 w-3" />
+                      {formatDistanceToNow(new Date(risk.createdAt), {
+                        addSuffix: true,
+                        locale: he,
+                      })}
                     </span>
-                  )}
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {formatDistanceToNow(new Date(risk.createdAt), {
-                      addSuffix: true,
-                      locale: he,
-                    })}
-                  </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-end gap-2">
+                  <Badge
+                    variant="outline"
+                    className={cn("text-xs", severityBadgeStyles[risk.severity])}
+                  >
+                    {SEVERITY_LABELS?.[risk.severity] ?? risk.severity}
+                  </Badge>
+
+                  <Badge
+                    variant="outline"
+                    className={cn("text-xs", statusBadgeStyles[risk.status] ?? "border-muted/40")}
+                  >
+                    {STATUS_LABELS?.[risk.status] ?? risk.status}
+                  </Badge>
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-2">
-                <Badge
-                  variant="outline"
-                  className={cn('text-xs', severityBadgeStyles[risk.severity])}
-                >
-                  {SEVERITY_LABELS[risk.severity]}
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className={cn('text-xs', statusBadgeStyles[risk.status])}
-                >
-                  {STATUS_LABELS[risk.status]}
-                </Badge>
-              </div>
             </div>
-          </Link>
-        ))}
+          );
+
+          // ✅ אם יש onRiskClick -> פותחים Drawer
+          if (onRiskClick) {
+            return (
+              <button
+                key={risk.id}
+                type="button"
+                onClick={() => onRiskClick(risk.id)}
+                className="w-full text-right"
+              >
+                {Card}
+              </button>
+            );
+          }
+
+          // אחרת – התנהגות ישנה (ניווט לעמוד)
+          return (
+            <Link key={risk.id} to={`/risks/${risk.id}`} className="block">
+              {Card}
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

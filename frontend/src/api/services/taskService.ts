@@ -10,7 +10,7 @@ import type {
 const BASE_PATH = "/api/tasks";
 
 export interface TaskFilters {
-  orgId: string;
+  organizationId: string;
   riskId?: string;
   assigneeUserId?: string;
   status?: TaskStatus;
@@ -48,6 +48,6 @@ export const taskService = {
   delete: async (taskId: string) =>
     (await taskHttp.delete<void>(`${BASE_PATH}/${taskId}`)).data,
 
-  countByStatus: async (orgId: string) =>
-    (await taskHttp.get<Record<TaskStatus, number>>(`${BASE_PATH}/stats/by-status?orgId=${orgId}`)).data,
+  countByStatus: async (organizationId: string) =>
+    (await taskHttp.get<Record<TaskStatus, number>>(`${BASE_PATH}/stats/by-status?organizationId=${organizationId}`)).data,
 };

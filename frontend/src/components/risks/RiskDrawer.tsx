@@ -1,3 +1,4 @@
+import type { AxiosError } from "axios";
 import { useEffect, useMemo, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -59,6 +60,7 @@ export function RiskDrawer({
   const [risk, setRisk] = useState<RiskBoundary | null>(null);
   const [tasks, setTasks] = useState<TaskBoundary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   TODO: "לביצוע",
@@ -114,26 +116,49 @@ export function RiskDrawer({
       console.error("changeStatus failed", e);
     }
   }
-
   useEffect(() => {
     if (!open || !riskId || !DEFAULT_ORG_ID) return;
 
     (async () => {
       setLoading(true);
+      setError(null);
+      setRisk(null);
+      setTasks([]);
+
       try {
-        const [r, t] = await Promise.all([
-          riskService.getById(riskId),
-          taskService.list({ orgId: DEFAULT_ORG_ID, riskId }),
-        ]);
+        const r = await riskService.getById(riskId);
         setRisk(r);
+      } catch (e) {
+        const err = e as AxiosError<any>;
+        console.error("getById failed", {
+          url: err.config?.baseURL ? `${err.config.baseURL}${err.config.url}` : err.config?.url,
+          method: err.config?.method,
+          status: err.response?.status,
+          data: err.response?.data,
+        });
+        setError(`שגיאה בטעינת סיכון: ${err.response?.status ?? ""}`);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const t = await taskService.list({ organizationId: DEFAULT_ORG_ID, riskId });
         setTasks(t);
       } catch (e) {
-        console.error("RiskDrawer load failed", e);
+        const err = e as AxiosError<any>;
+        console.error("task list failed", {
+          url: err.config?.baseURL ? `${err.config.baseURL}${err.config.url}` : err.config?.url,
+          method: err.config?.method,
+          status: err.response?.status,
+          data: err.response?.data,
+        });
+        setError(`שגיאה בטעינת מיטיגציות: ${err.response?.status ?? ""}`);
       } finally {
         setLoading(false);
       }
     })();
   }, [open, riskId]);
+
 
   const severity = useMemo(
     () => mapClassificationToUiSeverity(risk?.classification),
@@ -194,9 +219,22 @@ export function RiskDrawer({
             {loading && <span className="text-sm text-muted-foreground">טוען…</span>}
           </SheetTitle>
         </SheetHeader>
-
-        {!risk ? (
-          <div className="mt-6 text-sm text-muted-foreground">בחרי סיכון כדי לראות פירוט.</div>
+        {loading ? (
+          <div className="mt-6 text-sm text-muted-foreground">טוען נתונים…</div>
+        ) : error ? (
+          <div className="mt-6 text-sm text-red-600">
+            {error}
+            <div className="text-xs text-muted-foreground mt-2">
+              debug: riskId={riskId ?? "null"} organizationId={DEFAULT_ORG_ID ?? "null"}
+            </div>
+          </div>
+        ) : !risk ? (
+          <div className="mt-6 text-sm text-muted-foreground">
+            לא נטען סיכון (בדקי שה־riskId מגיע).
+            <div className="text-xs text-muted-foreground mt-2">
+              debug: riskId={riskId ?? "null"} organizationId={DEFAULT_ORG_ID ?? "null"}
+            </div>
+          </div>
         ) : (
           <div className="mt-4">
             <div className="mb-4 flex items-center justify-between gap-3">
@@ -245,11 +283,11 @@ export function RiskDrawer({
 
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={() => setCreateTaskOpen(true)}>
-                      הוסף משימה
+                      הוסף משימה (מיטיגציה)
                     </Button>
 
                     <Button variant="outline" onClick={exportTasks} disabled={!tasks.length}>
-                      ייצוא משימות
+                      ייצוא משימות (מיטיגציות)
                     </Button>
                   </div>
                 </div>
@@ -259,7 +297,7 @@ export function RiskDrawer({
                     <div className="p-4 text-sm text-muted-foreground">אין עדיין משימות לסיכון הזה.</div>
                   ) : (
                     tasks.map(t => (
-                      <div className="p-4 flex items-center justify-between gap-3">
+                      <div key={t.id} className="p-4 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <div className="font-medium truncate">{t.title}</div>
                           <div className="text-xs text-muted-foreground">

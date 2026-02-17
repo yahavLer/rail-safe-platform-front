@@ -1,3 +1,4 @@
+import { session } from "@/auth/session";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -40,7 +41,7 @@ export default function Login() {
         setOrgs(list);
 
         // If an orgId was saved earlier (after org signup), preselect it
-        const savedOrgId = localStorage.getItem(ORG_ID_KEY);
+        const savedOrgId = session.getOrgId();
         if (savedOrgId) setOrgId(savedOrgId);
       } catch (e: any) {
         toast.error("שגיאה בטעינת ארגונים", {
@@ -77,12 +78,14 @@ export default function Login() {
       });
 
       // Save session + org
-      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-      localStorage.setItem(ORG_ID_KEY, orgId);
-
+      session.setUser(user);
+      session.setOrgId(orgId);
       toast.success("התחברת בהצלחה!", {
         description: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email,
       });
+      console.log("Saved orgId:", orgId);
+      console.log("From localStorage:", localStorage.getItem("railsafe.orgId"));
+
 
       // Route by role
       if (user.role === "CHIEF_RISK_MANAGER") {

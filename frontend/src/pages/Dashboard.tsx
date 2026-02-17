@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { RiskMatrix } from "@/components/dashboard/RiskMatrix";
 import { RecentRisks } from "@/components/dashboard/RecentRisks";
+import { RiskDrawer } from "@/components/risks/RiskDrawer"; 
 
 import {
   AlertTriangle,
@@ -16,9 +17,8 @@ import {
 
 import { riskService } from "@/api/services/riskService";
 import { DEFAULT_ORG_ID } from "@/api/config";
+import { session } from "@/auth/session";
 
-// אם יש לך טיפוס UI משלך (RiskSeverity/RiskStatus) תשאירי.
-// פה אני מכין "adapter" שמחזיר אובייקט בסגנון mock כדי לא לשבור קומפוננטות.
 type UiRisk = {
   id: string;
   title: string;
@@ -59,8 +59,17 @@ export default function Dashboard() {
   const [byStatus, setByStatus] = useState<Record<string, number>>({});
   const [byClassification, setByClassification] = useState<Record<string, number>>({});
 
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedRiskId, setSelectedRiskId] = useState<string | null>(null);
+
+  function openRiskDrawer(riskId: string) {
+    setSelectedRiskId(riskId);
+    setDrawerOpen(true);
+  }
+
   useEffect(() => {
     if (!DEFAULT_ORG_ID) return;
+    console.log("session.getOrgId():", session.getOrgId());
 
     (async () => {
       setLoading(true);
@@ -199,8 +208,18 @@ export default function Dashboard() {
           risks={uiRisks as any}
           onCellClick={(likelihood, impact) => goToRisks({ score: likelihood * impact })} // ✅ תא במטריצה
         />
-        <RecentRisks risks={uiRisks as any} />
+        <RecentRisks
+              risks={uiRisks as any}
+              onRiskClick={openRiskDrawer}
+            />
+          </div>
+
+              {/* ✅ Drawer עצמו */}
+              <RiskDrawer
+                open={drawerOpen}
+                onOpenChange={setDrawerOpen}
+                riskId={selectedRiskId}
+              />
       </div>
-    </div>
   );
 }
