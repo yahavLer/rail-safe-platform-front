@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 import { riskService } from "@/api/services/riskService";
 import { taskService } from "@/api/services/taskService";
-import { DEFAULT_ORG_ID } from "@/api/config";
+import { getCurrentOrgId } from "@/api/config";
 import type { RiskBoundary, TaskBoundary, TaskStatus } from "@/api/types";
 
 import {
@@ -88,17 +88,22 @@ export function RiskDrawer({
   }
 
   async function createTask() {
-    if (!riskId || !DEFAULT_ORG_ID) return;
+    const orgId = getCurrentOrgId();
+    if (!riskId || !orgId) {
+      setError("אין ארגון מחובר. התחברי מחדש.");
+      return;
+    }
 
     try {
       const created = await taskService.create({
-        organizationId: DEFAULT_ORG_ID,
+        organizationId: orgId, // ✅ ב-POST זה נשאר organizationId
         riskId,
         title: taskForm.title.trim(),
         description: taskForm.description.trim(),
         assigneeUserId: taskForm.assigneeUserId.trim() || undefined,
         dueDate: toInstantIso(taskForm.dueDate),
       });
+
 
       setTasks(prev => [created, ...prev]);
       setCreateTaskOpen(false);
@@ -117,7 +122,8 @@ export function RiskDrawer({
     }
   }
   useEffect(() => {
-    if (!open || !riskId || !DEFAULT_ORG_ID) return;
+    const orgId = getCurrentOrgId();
+    if (!open || !riskId || !orgId) return;
 
     (async () => {
       setLoading(true);
@@ -130,34 +136,24 @@ export function RiskDrawer({
         setRisk(r);
       } catch (e) {
         const err = e as AxiosError<any>;
-        console.error("getById failed", {
-          url: err.config?.baseURL ? `${err.config.baseURL}${err.config.url}` : err.config?.url,
-          method: err.config?.method,
-          status: err.response?.status,
-          data: err.response?.data,
-        });
         setError(`שגיאה בטעינת סיכון: ${err.response?.status ?? ""}`);
         setLoading(false);
         return;
       }
 
       try {
-        const t = await taskService.list({ organizationId: DEFAULT_ORG_ID, riskId });
+        // ✅ ב-GET list הפרמטר נקרא orgId (Query param)
+        const t = await taskService.list({ orgId, riskId });
         setTasks(t);
       } catch (e) {
         const err = e as AxiosError<any>;
-        console.error("task list failed", {
-          url: err.config?.baseURL ? `${err.config.baseURL}${err.config.url}` : err.config?.url,
-          method: err.config?.method,
-          status: err.response?.status,
-          data: err.response?.data,
-        });
         setError(`שגיאה בטעינת מיטיגציות: ${err.response?.status ?? ""}`);
       } finally {
         setLoading(false);
       }
     })();
   }, [open, riskId]);
+
 
 
   const severity = useMemo(
@@ -225,14 +221,14 @@ export function RiskDrawer({
           <div className="mt-6 text-sm text-red-600">
             {error}
             <div className="text-xs text-muted-foreground mt-2">
-              debug: riskId={riskId ?? "null"} organizationId={DEFAULT_ORG_ID ?? "null"}
+              debug: riskId={riskId ?? "null"} orgId={getCurrentOrgId() || "null"}
             </div>
           </div>
         ) : !risk ? (
           <div className="mt-6 text-sm text-muted-foreground">
             לא נטען סיכון (בדקי שה־riskId מגיע).
             <div className="text-xs text-muted-foreground mt-2">
-              debug: riskId={riskId ?? "null"} organizationId={DEFAULT_ORG_ID ?? "null"}
+              debug: riskId={riskId ?? "null"} orgId={getCurrentOrgId() || "null"}
             </div>
           </div>
         ) : (

@@ -1,5 +1,6 @@
 // src/pages/ReportsPage.tsx
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
 import { FileText, Download } from "lucide-react";
@@ -19,9 +20,8 @@ import { Badge } from "@/components/ui/badge";
 
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { riskService } from "@/api/services/riskService";
-import { DEFAULT_ORG_ID } from "@/api/config";
-
-type RiskBoundary = any;
+import { getCurrentOrgId } from "@/api/config";
+import type { RiskBoundary } from "@/api/types";
 
 function toDateInputValue(d: Date) {
   return format(d, "yyyy-MM-dd");
@@ -49,7 +49,6 @@ function classificationLabel(c: string) {
 }
 
 function statusLabel(s: string) {
-  // אם יש לך STATUS_LABELS – אפשר להחליף לזה
   switch (s) {
     case "REQUIRES_TREATMENT":
       return "נדרש טיפול";
@@ -89,18 +88,31 @@ function downloadCsv(filename: string, rows: Record<string, any>[]) {
 }
 
 export default function ReportsPage() {
-  const orgId = DEFAULT_ORG_ID || (import.meta as any)?.env?.VITE_ORG_ID;
+  const nav = useNavigate();
+  const orgId = getCurrentOrgId();
 
   const [risks, setRisks] = useState<RiskBoundary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // פילטר תאריכים (לקוח)
-  const [from, setFrom] = useState(() => toDateInputValue(new Date(Date.now() - 30 * 86400000)));
+  const [from, setFrom] = useState(() =>
+    toDateInputValue(new Date(Date.now() - 30 * 86400000))
+  );
   const [to, setTo] = useState(() => toDateInputValue(new Date()));
 
+  // ✅ אם התחלף orgId – ננקה נתונים כדי לא לערבב ארגונים
   useEffect(() => {
-    if (!orgId) return;
+    setRisks([]);
+    setError(null);
+  }, [orgId]);
+
+  // ✅ Fetch risks לפי הארגון המחובר
+  useEffect(() => {
+    if (!orgId) {
+      setError("אין ארגון מחובר. התחברי מחדש כדי לראות דוחות.");
+      return;
+    }
 
     (async () => {
       setLoading(true);
@@ -121,11 +133,14 @@ export default function ReportsPage() {
     const dFrom = parseDateSafe(from);
     const dTo = parseDateSafe(to);
 
-    return risks.filter((r) => {
+    return risks.filter((r: any) => {
       const created = parseDateSafe(r.createdAt) ?? parseDateSafe(r.updatedAt);
       if (!created) return true;
 
-      if (dFrom && created < new Date(dFrom.getFullYear(), dFrom.getMonth(), dFrom.getDate())) return false;
+      if (dFrom) {
+        const start = new Date(dFrom.getFullYear(), dFrom.getMonth(), dFrom.getDate());
+        if (created < start) return false;
+      }
       if (dTo) {
         const end = new Date(dTo.getFullYear(), dTo.getMonth(), dTo.getDate(), 23, 59, 59, 999);
         if (created > end) return false;
@@ -136,7 +151,7 @@ export default function ReportsPage() {
 
   const byClassification = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const r of filtered) {
+    for (const r of filtered as any[]) {
       const key = r.classification ?? "UNKNOWN";
       map[key] = (map[key] ?? 0) + 1;
     }
@@ -145,7 +160,7 @@ export default function ReportsPage() {
 
   const byStatus = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const r of filtered) {
+    for (const r of filtered as any[]) {
       const key = r.status ?? "UNKNOWN";
       map[key] = (map[key] ?? 0) + 1;
     }
@@ -163,7 +178,8 @@ export default function ReportsPage() {
 
   const exportCsv = () => {
     if (!filtered.length) return;
-    const rows = filtered.map((r) => ({
+
+    const rows = (filtered as any[]).map((r) => ({
       id: r.id,
       title: r.title,
       classification: r.classification,
@@ -180,6 +196,17 @@ export default function ReportsPage() {
     downloadCsv(`reports_risks_${format(new Date(), "yyyyMMdd_HHmm")}.csv`, rows);
   };
 
+  // ✅ UI אם אין ארגון מחובר
+  if (!orgId) {
+    return (
+      <div className="space-y-3">
+        <h1 className="text-3xl font-bold">דוחות</h1>
+        <p className="text-sm text-red-500">אין ארגון מחובר. התחברי מחדש כדי לראות דוחות.</p>
+        <Button onClick={() => nav("/login")}>מעבר להתחברות</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
@@ -188,11 +215,10 @@ export default function ReportsPage() {
             <FileText className="h-6 w-6" />
             <h1 className="text-3xl font-bold">דוחות</h1>
           </div>
-          <p className="mt-1 text-muted-foreground">
-            פילוח מצב הסיכונים (לפי טווח תאריכים)
-          </p>
+          <p className="mt-1 text-muted-foreground">פילוח מצב הסיכונים (לפי טווח תאריכים)</p>
           {loading && <p className="mt-2 text-sm text-muted-foreground">טוען נתונים…</p>}
           {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+          <p className="mt-1 text-xs text-muted-foreground">debug: orgId={orgId}</p>
         </div>
 
         <div className="flex gap-2">
@@ -293,7 +319,7 @@ export default function ReportsPage() {
           <CardTitle>סיכונים בטווח — תצוגה מהירה</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          {filtered.slice(0, 8).map((r: any) => (
+          {(filtered as any[]).slice(0, 8).map((r) => (
             <div key={r.id} className="flex justify-between border-b py-2">
               <span className="font-medium text-foreground">{r.title}</span>
               <span>

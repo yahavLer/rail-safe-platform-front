@@ -1,4 +1,6 @@
 import { session } from "@/auth/session";
+import { setCurrentOrgId } from "@/api/config";
+
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -18,8 +20,6 @@ import { organizationService } from "@/api/services/organizationService";
 import { userService } from "@/api/services/userService";
 import type { OrganizationBoundary, UserBoundary } from "@/api/types";
 
-const SESSION_KEY = "railsafe.session";
-const ORG_ID_KEY = "railsafe.orgId";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -80,6 +80,7 @@ export default function Login() {
       // Save session + org
       session.setUser(user);
       session.setOrgId(orgId);
+      setCurrentOrgId(orgId); // update live binding for any direct imports
       toast.success("התחברת בהצלחה!", {
         description: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email,
       });

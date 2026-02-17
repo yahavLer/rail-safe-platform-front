@@ -37,7 +37,7 @@ import { toast } from "sonner";
 import { riskService } from "@/api/services/riskService";
 import { organizationService } from "@/api/services/organizationService";
 import type { CategoryBoundary } from "@/api/types";
-import { DEFAULT_ORG_ID } from "@/api/config";
+import { getCurrentOrgId } from "@/api/config";
 import type { CreateRiskBoundary } from "@/api/types";
 import { useRiskMatrix } from "@/hooks/useRiskMatrix";
 
@@ -54,7 +54,7 @@ const STEPS = [
 
 export default function NewRisk() {
   const navigate = useNavigate();
-
+  const orgId = getCurrentOrgId();
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
@@ -105,7 +105,7 @@ export default function NewRisk() {
     severityMap,
     loading: matrixLoading,
     error: matrixError,
-  } = useRiskMatrix(DEFAULT_ORG_ID);
+  } = useRiskMatrix(orgId);
 
   const score = calculateScore(formData.likelihood, formData.impact);
   const severity =
@@ -113,16 +113,17 @@ export default function NewRisk() {
 
   // --- Fetch categories from server ---
   const fetchCategories = async () => {
-    if (!DEFAULT_ORG_ID) {
-      toast.error("חסר ORG_ID", {
-        description: "בדקי ש-VITE_ORG_ID מוגדר ל-UUID אמיתי ב-.env",
+    if (!orgId) {
+      toast.error("אין ארגון מחובר", {
+        description: "התחברי מחדש כדי ליצור סיכון.",
       });
+      navigate("/login");
       return;
     }
 
     setCategoriesLoading(true);
     try {
-      const data = await organizationService.listCategories(DEFAULT_ORG_ID);
+      const data = await organizationService.listCategories(orgId);
 
       const activeSorted = data
         .filter((c) => c.active)
@@ -139,6 +140,10 @@ export default function NewRisk() {
       setCategoriesLoading(false);
     }
   };
+  useEffect(() => {
+    setCategories([]);
+    setFormData((p) => ({ ...p, categoryCode: "" })); // מומלץ כדי לא להשאיר קטגוריה מארגון אחר
+  }, [orgId]);
 
   // Load categories when entering step 2 (once)
   useEffect(() => {
@@ -177,16 +182,16 @@ export default function NewRisk() {
 
     // Step 5: Submit to backend
     try {
-      if (!DEFAULT_ORG_ID) {
-        throw new Error(
-          "חסר VITE_ORG_ID (.env) — חובה organizationId כדי ליצור סיכון"
-        );
+      if (!orgId) {
+        toast.error("אין ארגון מחובר", { description: "התחברי מחדש כדי ליצור סיכון." });
+        navigate("/login");
+        return;
       }
 
       setSubmitting(true);
 
       const payload: CreateRiskBoundary = {
-        organizationId: DEFAULT_ORG_ID,
+        organizationId: orgId,
 
         title: formData.title,
         description: formData.description,
@@ -207,7 +212,7 @@ export default function NewRisk() {
           await Promise.all(
             draftTasks.map((t) =>
               taskService.create({
-                organizationId: DEFAULT_ORG_ID,
+                organizationId: orgId,
                 riskId: createdRisk.id,
                 title: t.title,
                 description: t.description,

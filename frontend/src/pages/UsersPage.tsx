@@ -1,10 +1,10 @@
 // src/pages/UsersPage.tsx
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Users, Plus } from "lucide-react";
 
-import { DEFAULT_ORG_ID } from "@/api/config";
+import { getCurrentOrgId } from "@/api/config";
 import { userService } from "@/api/services/userService";
-
 import type { UserBoundary, UserRole, CreateUserBoundary } from "@/api/types";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +37,10 @@ const ROLE_LABEL: Record<UserRole, string> = {
 };
 
 export default function UsersPage() {
-  const orgId = DEFAULT_ORG_ID || (import.meta as any)?.env?.VITE_ORG_ID;
+  const nav = useNavigate();
+
+  // ✅ orgId דינמי לפי הארגון המחובר כרגע
+  const orgId = getCurrentOrgId();
 
   const [users, setUsers] = useState<UserBoundary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,9 +59,12 @@ export default function UsersPage() {
 
   async function load() {
     if (!orgId) {
-      setErr("אין OrgId. הגדירי VITE_ORG_ID או DEFAULT_ORG_ID.");
+      setErr("אין ארגון מחובר. התחברי מחדש כדי לנהל משתמשים.");
+      // אופציונלי: להפנות להתחברות
+      // nav("/login");
       return;
     }
+
     setLoading(true);
     setErr(null);
     try {
@@ -82,11 +88,11 @@ export default function UsersPage() {
     if (!s) return users;
 
     return users.filter((u) => {
-      const full = `${u.firstName} ${u.lastName}`.toLowerCase();
+      const full = `${u.firstName ?? ""} ${u.lastName ?? ""}`.toLowerCase();
       return (
         full.includes(s) ||
-        u.email.toLowerCase().includes(s) ||
-        String(u.role).toLowerCase().includes(s)
+        (u.email ?? "").toLowerCase().includes(s) ||
+        String(u.role ?? "").toLowerCase().includes(s)
       );
     });
   }, [users, q]);
@@ -96,7 +102,7 @@ export default function UsersPage() {
     setUsers((p) => p.map((u) => (u.id === userId ? { ...u, role } : u)));
 
     try {
-      await userService.updateRole(userId, { role }); // ✅ לפי השירות שלך
+      await userService.updateRole(userId, { role });
     } catch (e) {
       console.error(e);
       setUsers(prev);
@@ -109,7 +115,7 @@ export default function UsersPage() {
     setUsers((p) => p.map((u) => (u.id === userId ? { ...u, active } : u)));
 
     try {
-      await userService.update(userId, { active }); // ✅ לפי השירות שלך + UpdateUserBoundary
+      await userService.update(userId, { active });
     } catch (e) {
       console.error(e);
       setUsers(prev);
@@ -118,11 +124,14 @@ export default function UsersPage() {
   }
 
   async function createUser() {
-    if (!orgId) return;
-    setErr(null);
+    if (!orgId) {
+      setErr("אין ארגון מחובר. התחברי מחדש.");
+      nav("/login");
+      return;
+    }
 
+    setErr(null);
     try {
-      // אם CreateUserBoundary אצלך לא כולל password – אפשר להסיר את השורה או להשאיר עם cast.
       const payload = {
         orgId,
         firstName: form.firstName.trim(),
@@ -152,16 +161,25 @@ export default function UsersPage() {
             <h1 className="text-3xl font-bold">משתמשים</h1>
           </div>
           <p className="mt-1 text-muted-foreground">ניהול משתמשים והרשאות בארגון</p>
+
+          {!orgId && (
+            <p className="mt-2 text-sm text-red-500">
+              אין ארגון מחובר. התחברי מחדש כדי לנהל משתמשים.
+            </p>
+          )}
+
           {loading && <p className="mt-2 text-sm text-muted-foreground">טוען…</p>}
           {err && <p className="mt-2 text-sm text-red-500">{err}</p>}
         </div>
 
         <div className="flex gap-2">
-          <Button onClick={() => setOpen(true)}>
+          <Button onClick={() => setOpen(true)} disabled={!orgId}>
             <Plus className="ml-2 h-4 w-4" />
             הוסף משתמש
           </Button>
-          <Button variant="outline" onClick={load}>רענון</Button>
+          <Button variant="outline" onClick={load} disabled={!orgId}>
+            רענון
+          </Button>
         </div>
       </div>
 
@@ -170,7 +188,12 @@ export default function UsersPage() {
           <CardTitle>חיפוש</CardTitle>
         </CardHeader>
         <CardContent>
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש לפי שם/מייל/תפקיד…" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="חיפוש לפי שם/מייל/תפקיד…"
+            disabled={!orgId}
+          />
         </CardContent>
       </Card>
 
@@ -204,8 +227,9 @@ export default function UsersPage() {
                       className="h-9 rounded-md border bg-background px-2 text-sm"
                       value={u.role}
                       onChange={(e) => updateRole(u.id, e.target.value as UserRole)}
+                      disabled={!orgId}
                     >
-                      <option value="ADMIN">אדמין</option> 
+                      <option value="ADMIN">אדמין</option>
                       <option value="CHIEF_RISK_MANAGER">מנהל סיכונים ראשי</option>
                       <option value="DIVISION_RISK_MANAGER">מנהל סיכונים חטיבתי</option>
                       <option value="DEPARTMENT_RISK_MANAGER">מנהל סיכונים מחלקתי</option>
@@ -219,7 +243,11 @@ export default function UsersPage() {
 
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <Switch checked={u.active} onCheckedChange={(v) => toggleActive(u.id, v)} />
+                      <Switch
+                        checked={!!u.active}
+                        onCheckedChange={(v) => toggleActive(u.id, v)}
+                        disabled={!orgId}
+                      />
                       <span className="text-sm">{u.active ? "כן" : "לא"}</span>
                     </div>
                   </TableCell>
@@ -284,7 +312,7 @@ export default function UsersPage() {
             <Button variant="outline" onClick={() => setOpen(false)}>ביטול</Button>
             <Button
               onClick={createUser}
-              disabled={!form.firstName.trim() || !form.lastName.trim() || !form.email.trim()}
+              disabled={!orgId || !form.firstName.trim() || !form.lastName.trim() || !form.email.trim()}
             >
               יצירה
             </Button>

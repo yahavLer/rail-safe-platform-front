@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { riskService } from "@/api/services/riskService";
-import { DEFAULT_ORG_ID } from "@/api/config";
+import { getCurrentOrgId } from "@/api/config";
 import type { RiskBoundary, RiskClassification } from "@/api/types";
 
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,8 @@ export default function RisksList() {
   const nav = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const orgId = getCurrentOrgId();
+
   const [risks, setRisks] = useState<RiskBoundary[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -32,7 +34,6 @@ export default function RisksList() {
 
   const [search, setSearch] = useState("");
 
-  // ✅ פילטרים מה-URL
   const [classificationFilter, setClassificationFilter] = useState<RiskClassification | null>(null);
   const [scoreFilter, setScoreFilter] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -53,12 +54,15 @@ export default function RisksList() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!DEFAULT_ORG_ID) return;
+    if (!orgId) {
+      setRisks([]);
+      return;
+    }
 
     (async () => {
       setLoading(true);
       try {
-        const data = await riskService.list({ orgId: DEFAULT_ORG_ID });
+        const data = await riskService.list({ orgId });
         setRisks(data);
       } catch (e) {
         console.error("RisksList load failed", e);
@@ -66,7 +70,7 @@ export default function RisksList() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [orgId]);
 
   const filteredRisks = useMemo(() => {
     let list = risks;
@@ -92,6 +96,14 @@ export default function RisksList() {
   function openRiskDrawer(riskId: string) {
     setSelectedRiskId(riskId);
     setDrawerOpen(true);
+  }
+
+  if (!orgId) {
+    return (
+      <div className="mt-6 text-sm text-red-600">
+        אין ארגון מחובר. <button className="underline" onClick={() => nav("/login")}>התחברי</button>
+      </div>
+    );
   }
 
   return (
