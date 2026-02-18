@@ -16,48 +16,26 @@ import {
 } from "lucide-react";
 
 import { riskService } from "@/api/services/riskService";
+import { organizationService } from "@/api/services/organizationService";
 import { getCurrentOrgId } from "@/api/config";
 
-type UiRisk = {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  siteName?: string;
-  likelihood: number;
-  impact: number;
-  score: number;
-  severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-function mapClassificationToUiSeverity(
-  c: string
-): "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" {
-  switch (c) {
-    case "EXTREME_RED":
-      return "CRITICAL";
-    case "HIGH_ORANGE":
-      return "HIGH";
-    case "MEDIUM_YELLOW":
-      return "MEDIUM";
-    case "LOW_GREEN":
-      return "LOW";
-    default:
-      return "MEDIUM";
-  }
-}
+import type {
+  RiskBoundary,
+  RiskMatrixBoundary,
+  RiskStatus,
+  RiskClassification,
+} from "@/api/types";
 
 export default function Dashboard() {
   const nav = useNavigate();
 
-  const [uiRisks, setUiRisks] = useState<UiRisk[]>([]);
+  const [risks, setRisks] = useState<RiskBoundary[]>([]);
+  const [matrix, setMatrix] = useState<RiskMatrixBoundary | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const [byStatus, setByStatus] = useState<Record<string, number>>({});
-  const [byClassification, setByClassification] = useState<Record<string, number>>({});
+  const [byStatus, setByStatus] = useState<Record<RiskStatus, number>>({} as any);
+  const [byClassification, setByClassification] =
+    useState<Record<RiskClassification, number>>({} as any);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedRiskId, setSelectedRiskId] = useState<string | null>(null);
@@ -70,7 +48,6 @@ export default function Dashboard() {
   useEffect(() => {
     const orgId = getCurrentOrgId();
     if (!orgId) {
-      // אם אין org מחובר – נשלח להתחברות (או אפשר רק להציג הודעה)
       nav("/login");
       return;
     }
@@ -78,30 +55,15 @@ export default function Dashboard() {
     (async () => {
       setLoading(true);
       try {
-        // 1) סיכונים
-        const risks = await riskService.list({ orgId });
+        const [risksRes, matrixRes, statusMap, classMap] = await Promise.all([
+          riskService.list({ orgId }),
+          organizationService.getRiskMatrix(orgId),
+          riskService.countByStatus(orgId),
+          riskService.countByClassification(orgId),
+        ]);
 
-        const mapped: UiRisk[] = risks.map((r: any) => ({
-          id: r.id,
-          title: r.title,
-          description: r.description ?? "",
-          category: r.categoryCode,
-          siteName: r.location ?? undefined,
-          likelihood: r.frequencyLevel,
-          impact: r.severityLevel,
-          score: r.riskScore,
-          severity: mapClassificationToUiSeverity(r.classification),
-          status: r.status,
-          createdAt: r.createdAt,
-          updatedAt: r.updatedAt,
-        }));
-
-        setUiRisks(mapped);
-
-        // 2) סטטיסטיקות
-        const statusMap = await riskService.countByStatus(orgId);
-        const classMap = await riskService.countByClassification(orgId);
-
+        setRisks(risksRes);
+        setMatrix(matrixRes);
         setByStatus(statusMap as any);
         setByClassification(classMap as any);
       } catch (e) {
@@ -112,27 +74,30 @@ export default function Dashboard() {
     })();
   }, [nav]);
 
-  // ---- חישוב סטטיסטיקות לתצוגה ----
   const stats = useMemo(() => {
-    const totalRisks = uiRisks.length;
+    const totalRisks = risks.length;
 
     const criticalRisks = byClassification["EXTREME_RED"] ?? 0;
-    const highRisks = byClassification["HIGH_ORANGE"] ?? 0;
+    const highRisks = byClassification["HIGH_ACTION_ORANGE"] ?? 0;
 
-    const inProgressRisks = byStatus["IN_TREATMENT"] ?? 0;
-    const mitigatedThisMonth = byStatus["MITIGATED"] ?? 0;
+    const mitigationPlanned = byStatus["MITIGATION_PLANNED"] ?? 0;
+    const inProgress = byStatus["IN_PROGRESS"] ?? 0;
 
+    // אם עדיין אין SLA אצלך — נשאר 0
     const overdueRisks = 0;
+
+    const closed = byStatus["CLOSED"] ?? 0;
 
     return {
       totalRisks,
       criticalRisks,
       highRisks,
-      inProgressRisks,
+      mitigationPlanned,
+      inProgress,
       overdueRisks,
-      mitigatedThisMonth,
+      closed,
     };
-  }, [uiRisks, byStatus, byClassification]);
+  }, [risks, byStatus, byClassification]);
 
   function goToRisks(filters?: Record<string, string | number | undefined | null>) {
     const qs = new URLSearchParams();
@@ -155,24 +120,69 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <StatsCard title="סה״כ סיכונים" value={stats.totalRisks} icon={Shield} variant="default" onClick={() => goToRisks()} />
-        <StatsCard title="קריטיים" value={stats.criticalRisks} icon={AlertCircle} variant="critical" onClick={() => goToRisks({ classification: "EXTREME_RED" })} />
-        <StatsCard title="גבוהים" value={stats.highRisks} icon={AlertTriangle} variant="high" onClick={() => goToRisks({ classification: "HIGH_ORANGE" })} />
-        <StatsCard title="בטיפול" value={stats.inProgressRisks} icon={Clock} variant="medium" onClick={() => goToRisks({ status: "IN_TREATMENT" })} />
-        <StatsCard title="חריגי SLA" value={stats.overdueRisks} icon={TrendingDown} variant={stats.overdueRisks > 0 ? "critical" : "low"} />
-        <StatsCard title="הופחתו החודש" value={stats.mitigatedThisMonth} icon={CheckCircle} variant="low" onClick={() => goToRisks({ status: "MITIGATED" })} />
+        <StatsCard
+          title="סה״כ סיכונים"
+          value={stats.totalRisks}
+          icon={Shield}
+          variant="default"
+          onClick={() => goToRisks()}
+        />
+
+        <StatsCard
+          title="קריטיים"
+          value={stats.criticalRisks}
+          icon={AlertCircle}
+          variant="critical"
+          onClick={() => goToRisks({ classification: "EXTREME_RED" })}
+        />
+
+        <StatsCard
+          title="גבוהים"
+          value={stats.highRisks}
+          icon={AlertTriangle}
+          variant="high"
+          onClick={() => goToRisks({ classification: "HIGH_ACTION_ORANGE" })}
+        />
+
+        <StatsCard
+          title="בתכנון מיטיגציה"
+          value={stats.mitigationPlanned}
+          icon={Clock}
+          variant="medium"
+          onClick={() => goToRisks({ status: "MITIGATION_PLANNED" })}
+        />
+
+        <StatsCard
+          title="חריגי SLA"
+          value={stats.overdueRisks}
+          icon={TrendingDown}
+          variant={stats.overdueRisks > 0 ? "critical" : "low"}
+        />
+
+        <StatsCard
+          title="נסגרו"
+          value={stats.closed}
+          icon={CheckCircle}
+          variant="low"
+          onClick={() => goToRisks({ status: "CLOSED" })}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <RiskMatrix
-          risks={uiRisks as any}
+          risks={risks}
+          matrix={matrix}
           onCellClick={(likelihood, impact) => goToRisks({ score: likelihood * impact })}
         />
-        <RecentRisks risks={uiRisks as any} onRiskClick={openRiskDrawer} />
+
+        <RecentRisks risks={risks} onRiskClick={openRiskDrawer} />
       </div>
 
-      {/* Drawer */}
-      <RiskDrawer open={drawerOpen} onOpenChange={setDrawerOpen} riskId={selectedRiskId} />
+      <RiskDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        riskId={selectedRiskId}
+      />
     </div>
   );
 }

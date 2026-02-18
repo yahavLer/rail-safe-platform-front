@@ -15,6 +15,7 @@ import { Eye, Edit, MapPin, Bot, Image as ImageIcon } from "lucide-react";
 
 interface RiskTableProps {
   risks: RiskBoundary[];
+  categoryNameByCode?: Record<string, string>;
 
   /** Opens drawer (preferred). If not provided, falls back to Link navigation. */
   onViewRisk?: (riskId: string) => void;
@@ -26,35 +27,32 @@ interface RiskTableProps {
 /** צבעים לפי ה־classification מהשרת */
 const classificationBadgeStyles: Record<RiskClassification, string> = {
   EXTREME_RED: "bg-risk-critical-bg text-risk-critical border-risk-critical/20",
-  HIGH_ORANGE: "bg-risk-high-bg text-risk-high border-risk-high/20",
-  MEDIUM_YELLOW: "bg-risk-medium-bg text-risk-medium border-risk-medium/20",
-  LOW_GREEN: "bg-risk-low-bg text-risk-low border-risk-low/20",
+  HIGH_ACTION_ORANGE: "bg-risk-high-bg text-risk-high border-risk-high/20",
+  TOLERABLE_YELLOW: "bg-risk-medium-bg text-risk-medium border-risk-medium/20",
+  NEGLIGIBLE_GREEN: "bg-risk-low-bg text-risk-low border-risk-low/20",
 };
 
 const CLASSIFICATION_LABELS: Record<RiskClassification, string> = {
-  EXTREME_RED: "קריטי",
-  HIGH_ORANGE: "גבוה",
-  MEDIUM_YELLOW: "בינוני",
-  LOW_GREEN: "נמוך",
+  EXTREME_RED: "קריטי -קיצוני",
+  HIGH_ACTION_ORANGE: "גבוה - נדרש טיפול",
+  TOLERABLE_YELLOW: "בינוני - נסבל",
+  NEGLIGIBLE_GREEN: "נמוך - זניח",
 };
 
 /** סטטוסים לפי RiskStatus מהשרת */
 const statusBadgeStyles: Partial<Record<RiskStatus, string>> = {
-  NEW: "bg-status-new/10 text-status-new border-status-new/20",
-  IN_TREATMENT: "bg-status-in-progress/10 text-status-in-progress border-status-in-progress/20",
-  MITIGATED: "bg-status-mitigated/10 text-status-mitigated border-status-mitigated/20",
+  OPEN: "bg-status-new/10 text-status-new border-status-new/20",
+  MITIGATION_PLANNED: "bg-status-in-progress/10 text-status-in-progress border-status-in-progress/20",
+  IN_PROGRESS: "bg-status-in-progress/10 text-status-in-progress border-status-in-progress/20",
   CLOSED: "bg-status-closed/10 text-status-closed border-status-closed/20",
   DRAFT: "bg-muted/30 text-muted-foreground border-muted/40",
-  ACCEPTED: "bg-muted/30 text-muted-foreground border-muted/40",
 };
-
 const STATUS_LABELS_HE: Record<RiskStatus, string> = {
   DRAFT: "טיוטה",
-  NEW: "חדש",
-  IN_TREATMENT: "בטיפול",
-  MITIGATED: "הופחת",
+  OPEN: "פתוח",
+  MITIGATION_PLANNED: "תכנון מיטיגציה",
+  IN_PROGRESS: "בטיפול",
   CLOSED: "נסגר",
-  ACCEPTED: "התקבל",
 };
 
 const slaStyles = {
@@ -63,7 +61,7 @@ const slaStyles = {
   OVERDUE: "text-risk-critical",
 } as const;
 
-export function RiskTable({ risks, onViewRisk, onEditRisk }: RiskTableProps) {
+export function RiskTable({ risks,categoryNameByCode, onViewRisk, onEditRisk }: RiskTableProps) {
   return (
     <div className="card-elevated overflow-hidden">
       <Table>
@@ -88,6 +86,7 @@ export function RiskTable({ risks, onViewRisk, onEditRisk }: RiskTableProps) {
             const hasImage = Boolean((risk as any)?.imageUrl);
             const slaStatus = (risk as any)?.slaStatus as "ON_TIME" | "AT_RISK" | "OVERDUE" | undefined;
             const aiProcessedAt = (risk as any)?.aiProcessedAt as string | undefined;
+            const categoryName = categoryNameByCode?.[risk.categoryCode];
 
             return (
               <TableRow
@@ -108,7 +107,12 @@ export function RiskTable({ risks, onViewRisk, onEditRisk }: RiskTableProps) {
                 </TableCell>
 
                 <TableCell>
-                  <span className="text-sm text-muted-foreground">{risk.categoryCode}</span>
+                  <span
+                    className="text-sm text-muted-foreground"
+                    title={risk.categoryCode} // משאיר את הקוד כ-tooltip
+                  >
+                    {categoryName ?? risk.categoryCode}
+                  </span>
                 </TableCell>
 
                 <TableCell className="text-center">

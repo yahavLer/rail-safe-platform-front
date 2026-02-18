@@ -2,20 +2,25 @@
 
 // ============ Enums ============
 export type RiskStatus =
-  | "DRAFT"
-  | "NEW"
-  | "IN_TREATMENT"
-  | "MITIGATED"
+  | "OPEN"
+  | "MITIGATION_PLANNED"
+  | "IN_PROGRESS"
   | "CLOSED"
-  | "ACCEPTED";
+  | "DRAFT";
 
 export type RiskClassification =
   | "EXTREME_RED"
-  | "HIGH_ORANGE"
-  | "MEDIUM_YELLOW"
-  | "LOW_GREEN";
+  | "HIGH_ACTION_ORANGE"
+  | "TOLERABLE_YELLOW"
+  | "NEGLIGIBLE_GREEN";
+
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "CANCELED";
-export type UserRole = 'ADMIN' | 'CHIEF_RISK_MANAGER' | 'DIVISION_RISK_MANAGER' | 'DEPARTMENT_RISK_MANAGER' | 'EMPLOYEE';
+
+export type UserRole =
+  | "CHIEF_RISK_MANAGER"
+  | "DIVISION_RISK_MANAGER"
+  | "DEPARTMENT_RISK_MANAGER"
+  | "EMPLOYEE";
 
 // ============ Organization Boundaries ============
 export interface CreateOrganizationBoundary {
