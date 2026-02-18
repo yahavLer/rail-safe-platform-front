@@ -135,6 +135,8 @@ export interface UpdateRiskBoundary {
   riskManagerUserId?: string;
   location?: string;
   notes?: string;
+  severityAfter?: number;
+  frequencyAfter?: number;
 }
 
 export interface UpdateRiskStatusBoundary {

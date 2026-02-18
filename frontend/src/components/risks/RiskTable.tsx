@@ -166,7 +166,6 @@ export function RiskTable({ risks,categoryNameByCode, onViewRisk, onEditRisk }: 
                     <span className="text-sm text-muted-foreground">—</span>
                   )}
                 </TableCell>
-
                 <TableCell className="text-center">
                   {aiProcessedAt ? (
                     <div className="flex items-center justify-center">
@@ -178,29 +177,7 @@ export function RiskTable({ risks,categoryNameByCode, onViewRisk, onEditRisk }: 
                 </TableCell>
 
                 <TableCell>
-                  <div className="flex items-center justify-center gap-1">
-                    {/* VIEW -> Drawer */}
-                    {onViewRisk ? (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onViewRisk(risk.id);
-                        }}
-                        aria-label="צפייה בסיכון"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                        <Link to={`/risks/${risk.id}`}>
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    )}
-
+                  <div dir="ltr" className="flex items-center justify-start gap-1">
                     {/* EDIT */}
                     {onEditRisk ? (
                       <Button
@@ -217,13 +194,22 @@ export function RiskTable({ risks,categoryNameByCode, onViewRisk, onEditRisk }: 
                       </Button>
                     ) : (
                       <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                        <Link to={`/risks/${risk.id}/edit`}>
+                        <Link to={`/risks/${risk.id}/edit`} onClick={(e) => e.stopPropagation()}>
                           <Edit className="h-4 w-4" />
                         </Link>
                       </Button>
                     )}
+
+                    {/* VIEW -> עמוד פירוט מלא */}
+                    <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                      <Link to={`/risks/${risk.id}`} onClick={(e) => e.stopPropagation()}>
+                        <Eye className="h-4 w-4" />
+                      </Link>
+                    </Button>
                   </div>
                 </TableCell>
+
+
               </TableRow>
             );
           })}
