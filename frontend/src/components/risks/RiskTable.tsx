@@ -67,13 +67,13 @@ export function RiskTable({ risks,categoryNameByCode, onViewRisk, onEditRisk }: 
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">
-            <TableHead className="text-right font-semibold">כותרת</TableHead>
+            <TableHead className="text-right font-semibold">שם הסיכון</TableHead>
             <TableHead className="text-right font-semibold">קטגוריה</TableHead>
             <TableHead className="text-center font-semibold">ציון</TableHead>
             <TableHead className="text-center font-semibold">חומרה</TableHead>
             <TableHead className="text-center font-semibold">סטטוס</TableHead>
             <TableHead className="text-right font-semibold">מיקום</TableHead>
-            <TableHead className="text-right font-semibold">אחראי</TableHead>
+            <TableHead className="text-right font-semibold">אחראי הסיכון</TableHead>
             <TableHead className="text-center font-semibold">SLA</TableHead>
             <TableHead className="text-center font-semibold">AI</TableHead>
             <TableHead className="text-center font-semibold">פעולות</TableHead>

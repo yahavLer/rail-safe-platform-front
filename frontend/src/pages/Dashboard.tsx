@@ -79,6 +79,9 @@ export default function Dashboard() {
 
     const criticalRisks = byClassification["EXTREME_RED"] ?? 0;
     const highRisks = byClassification["HIGH_ACTION_ORANGE"] ?? 0;
+    const mediumRisks = byClassification["TOLERABLE_YELLOW"] ?? 0;
+    const lowRisks = byClassification["NEGLIGIBLE_GREEN"] ?? 0;
+
 
     const mitigationPlanned = byStatus["MITIGATION_PLANNED"] ?? 0;
     const inProgress = byStatus["IN_PROGRESS"] ?? 0;
@@ -92,6 +95,8 @@ export default function Dashboard() {
       totalRisks,
       criticalRisks,
       highRisks,
+      mediumRisks,
+      lowRisks,
       mitigationPlanned,
       inProgress,
       overdueRisks,
@@ -119,7 +124,41 @@ export default function Dashboard() {
         {loading && <p className="mt-2 text-sm text-muted-foreground">טוען נתונים...</p>}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+
+
+        <StatsCard
+          title="סה״כ סיכונים קריטיים"
+          value={stats.criticalRisks}
+          icon={AlertCircle}
+          variant="critical"
+          onClick={() => goToRisks({ classification: "EXTREME_RED" })}
+        />
+
+        <StatsCard
+          title="סה״כ סיכונים גבוהים"
+          value={stats.highRisks}
+          icon={AlertTriangle}
+          variant="high"
+          onClick={() => goToRisks({ classification: "HIGH_ACTION_ORANGE" })}
+        />
+
+        <StatsCard
+          title="סה״כ סיכונים בינוניים"
+          value={stats.mediumRisks}
+          icon={AlertTriangle}
+          variant="medium"
+          onClick={() => goToRisks({ classification: "MEDIUM_YELLOW" })}
+        />
+
+        <StatsCard
+          title="סה״כ סיכונים זניחים"
+          value={stats.lowRisks}
+          icon={AlertTriangle}
+          variant="low"
+          onClick={() => goToRisks({ classification: "LOW_GREEN" })}
+        />        
+
         <StatsCard
           title="סה״כ סיכונים"
           value={stats.totalRisks}
@@ -129,26 +168,10 @@ export default function Dashboard() {
         />
 
         <StatsCard
-          title="קריטיים"
-          value={stats.criticalRisks}
-          icon={AlertCircle}
-          variant="critical"
-          onClick={() => goToRisks({ classification: "EXTREME_RED" })}
-        />
-
-        <StatsCard
-          title="גבוהים"
-          value={stats.highRisks}
-          icon={AlertTriangle}
-          variant="high"
-          onClick={() => goToRisks({ classification: "HIGH_ACTION_ORANGE" })}
-        />
-
-        <StatsCard
           title="בתכנון מיטיגציה"
           value={stats.mitigationPlanned}
           icon={Clock}
-          variant="medium"
+          variant="default"
           onClick={() => goToRisks({ status: "MITIGATION_PLANNED" })}
         />
 
@@ -163,7 +186,7 @@ export default function Dashboard() {
           title="נסגרו"
           value={stats.closed}
           icon={CheckCircle}
-          variant="low"
+          variant="default"
           onClick={() => goToRisks({ status: "CLOSED" })}
         />
       </div>

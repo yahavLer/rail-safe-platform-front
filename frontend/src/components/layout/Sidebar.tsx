@@ -73,7 +73,7 @@ export function Sidebar() {
               <Train className="h-6 w-6 text-sidebar-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-sidebar-foreground">Rail-Safe AI</h1>
+              <h1 className="text-lg font-bold text-sidebar-foreground">RiskBox AI</h1>
               <p className="text-xs text-sidebar-foreground/60">ניהול סיכוני בטיחות</p>
             </div>
           </div>

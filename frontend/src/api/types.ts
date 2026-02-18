@@ -90,6 +90,9 @@ export interface CreateRiskBoundary {
 
   location?: string;
   notes?: string;
+
+  severityAfter?: number;
+  frequencyAfter?: number;
 }
 
 export interface RiskBoundary {

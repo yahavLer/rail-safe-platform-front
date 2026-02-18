@@ -1,5 +1,8 @@
+import { userService } from "@/api/services/userService";
+import type { UserBoundary } from "@/api/types"; 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { User, TrendingDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +43,6 @@ import type { CategoryBoundary } from "@/api/types";
 import { getCurrentOrgId } from "@/api/config";
 import type { CreateRiskBoundary } from "@/api/types";
 import { useRiskMatrix } from "@/hooks/useRiskMatrix";
-
 import { taskService } from "@/api/services/taskService";
 import type { CreateTaskBoundary } from "@/api/types";
 
@@ -49,14 +51,146 @@ const STEPS = [
   { id: 2, title: "קטגוריה ומיקום", icon: Tag },
   { id: 3, title: "סבירות", icon: BarChart3 },
   { id: 4, title: "השפעה", icon: Zap },
-  { id: 5, title: "בקרות וסיכום", icon: Shield },
+  { id: 5, title: "אחראי וסיכון שיורי", icon: User },  
+  { id: 6, title: "בקרות וסיכום", icon: Shield },
 ];
+type Tone = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+const toneFromLevel = (level: number): Tone => {
+  if (level >= 4) return "CRITICAL";
+  if (level === 3) return "HIGH";
+  if (level === 2) return "MEDIUM";
+  return "LOW";
+};
+
+const TONE_STYLES: Record<
+  Tone,
+  { border: string; softBg: string; solidBg: string; text: string }
+> = {
+  LOW: {
+    border: "border-risk-low",
+    softBg: "bg-risk-low-bg",
+    solidBg: "bg-risk-low",
+    text: "text-risk-low",
+  },
+  MEDIUM: {
+    border: "border-risk-medium",
+    softBg: "bg-risk-medium-bg",
+    solidBg: "bg-risk-medium",
+    text: "text-risk-medium",
+  },
+  HIGH: {
+    border: "border-risk-high",
+    softBg: "bg-risk-high-bg",
+    solidBg: "bg-risk-high",
+    text: "text-risk-high",
+  },
+  CRITICAL: {
+    border: "border-risk-critical",
+    softBg: "bg-risk-critical-bg",
+    solidBg: "bg-risk-critical",
+    text: "text-risk-critical",
+  },
+};
+
+function LevelCard(props: {
+  value: number;
+  selected: boolean;
+  onClick: () => void;
+  title: string;
+  description?: string;
+}) {
+  const { value, selected, onClick, title, description } = props;
+  const tone = toneFromLevel(value);
+  const s = TONE_STYLES[tone];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "group relative overflow-hidden rounded-xl border-2 p-6 text-right transition-all duration-200",
+        // תמיד “רומז” על צבע לפי רמה, ובבחירה ממלא רקע
+        s.border,
+        selected ? cn(s.softBg, "shadow-glow") : "bg-background hover:bg-muted/40"
+      )}
+    >
+      {/* פס צבע קטן למעלה כמו אינדיקציה */}
+      <div className={cn("absolute inset-x-0 top-0 h-1", s.solidBg)} />
+
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className={cn("text-sm font-medium", selected ? s.text : "text-foreground")}>
+            {title}
+          </div>
+          {description && (
+            <div className="mt-1 text-xs text-muted-foreground">
+              {description}
+            </div>
+          )}
+        </div>
+
+        {/* עיגול מספר בצבע הרמה */}
+        <div
+          className={cn(
+            "flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 text-xl font-bold transition",
+            s.border,
+            selected
+              ? cn(s.solidBg, "text-white")
+              : cn("bg-background text-foreground group-hover:" + s.solidBg, "group-hover:text-white")
+          )}
+        >
+          {value}
+        </div>
+      </div>
+    </button>
+  );
+}
 
 export default function NewRisk() {
   const navigate = useNavigate();
   const orgId = getCurrentOrgId();
+
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+
+  // ✅ Users state
+  const [users, setUsers] = useState<UserBoundary[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+
+  // ✅ Fetch users from server (לפי userService שלך)
+  const fetchUsers = async () => {
+    if (!orgId) return;
+
+    setUsersLoading(true);
+    try {
+      const data = await userService.list({ orgId });
+
+      const sorted = (data ?? []).sort((a, b) =>
+        `${a.firstName ?? ""} ${a.lastName ?? ""}`.localeCompare(
+          `${b.firstName ?? ""} ${b.lastName ?? ""}`
+        )
+      );
+
+      setUsers(sorted);
+    } catch (e: any) {
+      toast.error("שגיאה בטעינת משתמשים", {
+        description:
+          e?.response?.data?.message || e?.message || "לא ניתן למשוך משתמשים מהשרת",
+      });
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  // ✅ טעינה אוטומטית כשנכנסים לשלב 5
+  useEffect(() => {
+    if (currentStep !== 5) return;
+    if (usersLoading) return;
+    if (users.length > 0) return;
+    fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -65,6 +199,14 @@ export default function NewRisk() {
     siteName: "",
     likelihood: 0,
     impact: 0,
+
+    // ✅ Owner
+    riskManagerUserId: "",
+
+    // ✅ Residual ("אחרי")
+    frequencyAfter: 0,
+    severityAfter: 0,
+
     notes: "",
   });
 
@@ -110,7 +252,11 @@ export default function NewRisk() {
   const score = calculateScore(formData.likelihood, formData.impact);
   const severity =
     formData.likelihood && formData.impact ? calculateSeverity(score) : null;
-
+  const residualScore = calculateScore(formData.frequencyAfter, formData.severityAfter);
+  const residualSeverity =
+    formData.frequencyAfter && formData.severityAfter 
+    ? calculateSeverity(residualScore)
+    : null;
   // --- Fetch categories from server ---
   const fetchCategories = async () => {
     if (!orgId) {
@@ -155,32 +301,41 @@ export default function NewRisk() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);
 
-  const canProceed = () => {
-    switch (currentStep) {
-      case 1:
-        return formData.title.length >= 5 && formData.description.length >= 10;
-      case 2:
-        return formData.categoryCode !== "";
-      case 3:
-        return formData.likelihood > 0;
-      case 4:
-        return formData.impact > 0;
-      case 5:
-        return true;
-      default:
-        return false;
-    }
-  };
+const canProceed = () => {
+  switch (currentStep) {
+    case 1:
+      return formData.title.length >= 5 && formData.description.length >= 10;
+    case 2:
+      return formData.categoryCode !== "";
+    case 3:
+      return formData.likelihood > 0;
+    case 4:
+      return formData.impact > 0;
+    case 5:
+      return (
+        formData.riskManagerUserId !== "" &&
+        formData.frequencyAfter > 0 &&
+        formData.severityAfter > 0
+      );
+    case 6:
+      return true;
+    default:
+      return false;
+  }
+};
+
 
   const handleNext = async () => {
     if (submitting) return;
 
-    if (currentStep < 5) {
+    const LAST_STEP = STEPS.length;
+
+    if (currentStep < LAST_STEP) {
       setCurrentStep((s) => s + 1);
       return;
     }
 
-    // Step 5: Submit to backend
+    // Step 6: Submit to backend
     try {
       if (!orgId) {
         toast.error("אין ארגון מחובר", { description: "התחברי מחדש כדי ליצור סיכון." });
@@ -199,6 +354,10 @@ export default function NewRisk() {
 
         frequencyLevel: formData.likelihood,
         severityLevel: formData.impact,
+
+        riskManagerUserId: formData.riskManagerUserId || undefined,
+        frequencyAfter: formData.frequencyAfter,
+        severityAfter: formData.severityAfter,
 
         location: formData.siteName || undefined,
         notes: formData.notes || undefined,
@@ -431,29 +590,14 @@ export default function NewRisk() {
 
             <div className="grid grid-cols-2 gap-4">
               {[1, 2, 3, 4].map((value) => (
-                <button
+                <LevelCard
                   key={value}
-                  type="button"
+                  value={value}
+                  selected={formData.likelihood === value}
                   onClick={() => setFormData({ ...formData, likelihood: value })}
-                  className={cn(
-                    "flex flex-col items-center justify-center rounded-xl border-2 p-6 transition-all duration-200",
-                    formData.likelihood === value
-                      ? "border-primary bg-primary/5 shadow-glow"
-                      : "border-border hover:border-primary/50 hover:bg-muted/50"
-                  )}
-                >
-                  <span className="text-3xl font-bold">{value}</span>
-
-                  <span className="mt-2 text-sm font-medium">
-                    {frequencyMap[value]?.label ?? `רמה ${value}`}
-                  </span>
-
-                  {frequencyMap[value]?.description && (
-                    <span className="mt-1 text-xs text-muted-foreground text-center">
-                      {frequencyMap[value]?.description}
-                    </span>
-                  )}
-                </button>
+                  title={frequencyMap[value]?.label ?? `רמה ${value}`}
+                  description={frequencyMap[value]?.description}
+                />
               ))}
             </div>
           </div>
@@ -471,36 +615,107 @@ export default function NewRisk() {
 
             <div className="grid grid-cols-2 gap-4">
               {[1, 2, 3, 4].map((value) => (
-                <button
+                <LevelCard
                   key={value}
-                  type="button"
+                  value={value}
+                  selected={formData.impact === value}
                   onClick={() => setFormData({ ...formData, impact: value })}
-                  className={cn(
-                    "flex flex-col items-center justify-center rounded-xl border-2 p-6 transition-all duration-200",
-                    formData.impact === value
-                      ? "border-primary bg-primary/5 shadow-glow"
-                      : "border-border hover:border-primary/50 hover:bg-muted/50"
-                  )}
-                >
-                  <span className="text-3xl font-bold">{value}</span>
-                  <span className="mt-2 text-sm font-medium">
-                    {severityMap[value]?.label ?? `רמה ${value}`}
-                  </span>
-
-                  {severityMap[value]?.description && (
-                    <span className="mt-1 text-xs text-muted-foreground text-center">
-                      {severityMap[value]?.description}
-                    </span>
-                  )}
-
-                </button>
+                  title={severityMap[value]?.label ?? `רמה ${value}`}
+                  description={severityMap[value]?.description}
+                />
               ))}
             </div>
           </div>
         )}
 
-        {/* Step 5: Summary */}
+        {/* Step 5: Owner + Residual */}
         {currentStep === 5 && (
+          <div className="space-y-6">
+            <div>
+              <Label className="text-lg font-semibold">אחראי/ת על הסיכון *</Label>
+              <p className="text-sm text-muted-foreground">
+                בחרי מי הבעלים של הסיכון בארגון
+              </p>
+            </div>
+
+            {/* ✅ כאן ה-Select */}
+            <Select
+              value={formData.riskManagerUserId}
+              onValueChange={(value) =>
+                setFormData({ ...formData, riskManagerUserId: value })
+              }
+              onOpenChange={(open) => {
+                if (!open) return;
+                if (!usersLoading && users.length === 0) fetchUsers(); // Lazy-load
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={usersLoading ? "טוען משתמשים..." : "בחר משתמש"} />
+              </SelectTrigger>
+
+              <SelectContent>
+                {usersLoading && (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">טוען...</div>
+                )}
+
+                {!usersLoading && users.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    אין משתמשים לארגון הזה
+                  </div>
+                )}
+
+                {users.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.firstName} {u.lastName} ({u.email})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="pt-2">
+              <Label className="text-lg font-semibold">רמת סיכון אחרי מיטיגציות *</Label>
+              <p className="text-sm text-muted-foreground">
+                לאן את/ה מצפה שהסיכון “ירד” אחרי ביצוע המשימות?
+              </p>
+            </div>
+
+            <div>
+              <Label className="font-medium">סבירות אחרי *</Label>
+              <div className="mt-3 grid grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map((value) => (
+                  <LevelCard
+                    key={value}
+                    value={value}
+                    selected={formData.frequencyAfter === value}
+                    onClick={() => setFormData({ ...formData, frequencyAfter: value })}
+                    title={frequencyMap[value]?.label ?? `רמה ${value}`}
+                    description={frequencyMap[value]?.description}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label className="font-medium">השפעה אחרי *</Label>
+              <div className="mt-3 grid grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map((value) => (
+                  <LevelCard
+                    key={value}
+                    value={value}
+                    selected={formData.severityAfter === value}
+                    onClick={() => setFormData({ ...formData, severityAfter: value })}
+                    title={severityMap[value]?.label ?? `רמה ${value}`}
+                    description={severityMap[value]?.description}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {/* Step 6: Summary */}
+        {currentStep === 6 && (
           <div className="space-y-6">
             <div>
               <Label className="text-lg font-semibold">סיכום</Label>
@@ -576,8 +791,30 @@ export default function NewRisk() {
                 <span className="font-medium">
                   {(severityMap[formData.impact]?.label ?? `רמה ${formData.impact}`)} ({formData.impact})
                 </span>
-
               </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">אחראי:</span>
+                <span className="font-medium">
+                  {users.find(u => u.id === formData.riskManagerUserId)
+                    ? `${users.find(u => u.id === formData.riskManagerUserId)!.firstName} ${users.find(u => u.id === formData.riskManagerUserId)!.lastName}`
+                    : "לא נבחר"}
+                </span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">סבירות אחרי:</span>
+                <span className="font-medium">
+                  {(frequencyMap[formData.frequencyAfter]?.label ?? `רמה ${formData.frequencyAfter}`)} ({formData.frequencyAfter})
+                </span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">השפעה אחרי:</span>
+                <span className="font-medium">
+                  {(severityMap[formData.severityAfter]?.label ?? `רמה ${formData.severityAfter}`)} ({formData.severityAfter})
+                </span>
+              </div>
+
             </div>
 
             {/* Notes */}
@@ -684,8 +921,8 @@ export default function NewRisk() {
         </Button>
 
         <Button onClick={handleNext} disabled={!canProceed() || submitting}>
-          {submitting ? "שומר..." : currentStep === 5 ? "צור סיכון" : "הבא"}
-          {currentStep < 5 && !submitting && <ArrowLeft className="mr-2 h-4 w-4" />}
+          {submitting ? "שומר..." : currentStep === STEPS.length ? "צור סיכון" : "הבא"}
+          {currentStep < STEPS.length && !submitting && <ArrowLeft className="mr-2 h-4 w-4" />}
         </Button>
       </div>
     </div>

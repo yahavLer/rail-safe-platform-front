@@ -37,11 +37,11 @@ function classificationLabel(c: string) {
   switch (c) {
     case "EXTREME_RED":
       return "קריטי";
-    case "HIGH_ORANGE":
+    case "HIGH_ACTION_ORANGE":
       return "גבוה";
-    case "MEDIUM_YELLOW":
+    case "TOLERABLE_YELLOW":
       return "בינוני";
-    case "LOW_GREEN":
+    case "NEGLIGIBLE_GREEN":
       return "נמוך";
     default:
       return c;
@@ -50,12 +50,16 @@ function classificationLabel(c: string) {
 
 function statusLabel(s: string) {
   switch (s) {
-    case "REQUIRES_TREATMENT":
-      return "נדרש טיפול";
-    case "IN_TREATMENT":
+    case "OPEN":
+      return "פתוח";
+    case "MITIGATION_PLANNED":
+      return "תכנון מיטיגציה";
+    case "IN_PROGRESS":
       return "בטיפול";
-    case "MITIGATED":
-      return "בוצע";
+    case "CLOSED":
+      return "נסגר";
+    case "DRAFT":
+      return "טיוטה";
     default:
       return s;
   }
