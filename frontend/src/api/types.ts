@@ -71,7 +71,7 @@ export interface UpdateCategoryBoundary {
 
 // ============ Risk Boundaries ============
 export interface CreateRiskBoundary {
-  organizationId: string;
+  orgId: string;
   divisionId?: string;
   departmentId?: string;
   riskManagerUserId?: string;
@@ -135,7 +135,7 @@ export interface UpdateRiskStatusBoundary {
 
 // ============ Task Boundaries ============
 export interface CreateTaskBoundary {
-  organizationId: string;   
+  orgId: string;   
   riskId: string;
   title: string;
   description: string;      
@@ -145,7 +145,7 @@ export interface CreateTaskBoundary {
 
 export interface TaskBoundary {
   id: string;
-  organizationId: string;   
+  orgId: string;   
   riskId: string;
   title: string;
   description: string;      

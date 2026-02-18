@@ -1,3 +1,4 @@
+// src/api/services/taskService.ts
 import { taskHttp } from "../http";
 import type {
   TaskBoundary,
@@ -10,7 +11,7 @@ import type {
 const BASE_PATH = "/api/tasks";
 
 export interface TaskFilters {
-  organizationId: string;
+  orgId: string; // ✅ היה orgId
   riskId?: string;
   assigneeUserId?: string;
   status?: TaskStatus;
@@ -49,5 +50,7 @@ export const taskService = {
     (await taskHttp.delete<void>(`${BASE_PATH}/${taskId}`)).data,
 
   countByStatus: async (orgId: string) =>
-    (await taskHttp.get<Record<TaskStatus, number>>(`${BASE_PATH}/stats/by-status?orgId=${orgId}`)).data,
+    (await taskHttp.get<Record<TaskStatus, number>>(
+      `${BASE_PATH}/stats/by-status?orgId=${orgId}`
+    )).data,
 };

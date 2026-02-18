@@ -96,7 +96,7 @@ export function RiskDrawer({
 
     try {
       const created = await taskService.create({
-        organizationId: orgId, // ✅ ב-POST זה נשאר organizationId
+        orgId: orgId, // ✅ ב-POST זה נשאר orgId
         riskId,
         title: taskForm.title.trim(),
         description: taskForm.description.trim(),

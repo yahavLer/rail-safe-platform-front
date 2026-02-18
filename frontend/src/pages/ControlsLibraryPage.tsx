@@ -149,7 +149,7 @@ export default function ControlsLibraryPage() {
 
     try {
       const [tasks, riskList] = await Promise.all([
-        taskService.list({ organizationId: orgId }),
+        taskService.list({ orgId: orgId }),
         riskService.list({ orgId }),
       ]);
 
@@ -252,7 +252,7 @@ export default function ControlsLibraryPage() {
         }
 
         const created = await taskService.create({
-          organizationId: orgId,
+          orgId: orgId,
           riskId: form.riskId,
           title,
           description,

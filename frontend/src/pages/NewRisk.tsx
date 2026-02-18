@@ -69,7 +69,7 @@ export default function NewRisk() {
   });
 
   const [draftTasks, setDraftTasks] = useState<
-  Array<Omit<CreateTaskBoundary, "organizationId" | "riskId">>>([]);
+  Array<Omit<CreateTaskBoundary, "orgId" | "riskId">>>([]);
 
   const [draftTaskForm, setDraftTaskForm] = useState({
     title: "",
@@ -191,7 +191,7 @@ export default function NewRisk() {
       setSubmitting(true);
 
       const payload: CreateRiskBoundary = {
-        organizationId: orgId,
+        orgId: orgId,
 
         title: formData.title,
         description: formData.description,
@@ -212,7 +212,7 @@ export default function NewRisk() {
           await Promise.all(
             draftTasks.map((t) =>
               taskService.create({
-                organizationId: orgId,
+                orgId: orgId,
                 riskId: createdRisk.id,
                 title: t.title,
                 description: t.description,
