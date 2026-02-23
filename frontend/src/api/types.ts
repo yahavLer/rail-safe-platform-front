@@ -171,6 +171,7 @@ export interface UpdateTaskBoundary {
   title?: string;
   description?: string;
   dueDate?: string;
+  assigneeUserId?: string;
 }
 
 export interface UpdateTaskStatusBoundary {

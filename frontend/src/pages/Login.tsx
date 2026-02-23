@@ -20,6 +20,7 @@ import { organizationService } from "@/api/services/organizationService";
 import { userService } from "@/api/services/userService";
 import type { OrganizationBoundary, UserBoundary } from "@/api/types";
 
+import { Eye, EyeOff } from "lucide-react";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -28,9 +29,12 @@ export default function Login() {
   const [loadingOrgs, setLoadingOrgs] = useState(true);
 
   const [orgId, setOrgId] = useState("");
+  const [orgQuery, setOrgQuery] = useState(""); // ✅ חיפוש ארגון
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const [showPassword, setShowPassword] = useState(false); // ✅ עין
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -40,9 +44,15 @@ export default function Login() {
         const list = await organizationService.listOrganizations();
         setOrgs(list);
 
-        // If an orgId was saved earlier (after org signup), preselect it
-        const savedOrgId = session.getOrgId();
-        if (savedOrgId) setOrgId(savedOrgId);
+        // ✅ Preselect org from session if exists - validate it
+        const saved = session.getOrgId();
+        if (saved) {
+          const byId = list.find((o) => o.id === saved);
+          const byName = list.find((o) => o.name === saved); // אם פעם נשמר בטעות שם
+          if (byId) setOrgId(byId.id);
+          else if (byName) setOrgId(byName.id);
+          else setOrgId("");
+        }
       } catch (e: any) {
         toast.error("שגיאה בטעינת ארגונים", {
           description: e?.response?.data?.message || e?.message || "שגיאה לא ידועה",
@@ -52,6 +62,12 @@ export default function Login() {
       }
     })();
   }, []);
+
+  const filteredOrgs = useMemo(() => {
+    const q = orgQuery.trim().toLowerCase();
+    if (!q) return orgs;
+    return orgs.filter((o) => (o.name ?? "").toLowerCase().includes(q));
+  }, [orgs, orgQuery]);
 
   const canSubmit = useMemo(() => {
     return (
@@ -64,7 +80,9 @@ export default function Login() {
 
   const onSubmit = async () => {
     if (!canSubmit) {
-      toast.error("חסר מידע", { description: "בחרי ארגון והזיני אימייל וסיסמה תקינים" });
+      toast.error("חסר מידע", {
+        description: "בחרי ארגון והזיני אימייל וסיסמה תקינים",
+      });
       return;
     }
 
@@ -77,18 +95,18 @@ export default function Login() {
         password,
       });
 
-      // Save session + org
+      // ✅ Save session + org (יציב)
       session.setUser(user);
       session.setOrgId(orgId);
-      setCurrentOrgId(orgId); // update live binding for any direct imports
+
+      // ✅ חשוב ל-NewRisk: שיהיה גם ב-config וגם בלוקאלסטורג'
+      setCurrentOrgId(orgId);
+      localStorage.setItem("railsafe.orgId", orgId); // ליתר ביטחון
+
       toast.success("התחברת בהצלחה!", {
         description: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email,
       });
-      console.log("Saved orgId:", orgId);
-      console.log("From localStorage:", localStorage.getItem("railsafe.orgId"));
 
-
-      // Route by role
       if (user.role === "CHIEF_RISK_MANAGER") {
         navigate("/risk-definitions");
       } else {
@@ -97,9 +115,7 @@ export default function Login() {
     } catch (e: any) {
       toast.error("התחברות נכשלה", {
         description:
-          e?.response?.data?.message ||
-          e?.message ||
-          "אימייל/סיסמה/ארגון לא נכונים",
+          e?.response?.data?.message || e?.message || "אימייל/סיסמה/ארגון לא נכונים",
       });
     } finally {
       setSubmitting(false);
@@ -116,22 +132,41 @@ export default function Login() {
       </div>
 
       <div className="card-elevated p-6 space-y-5">
+        {/* ✅ Organization with search */}
         <div className="space-y-2">
           <Label>ארגון</Label>
+
+          <Input
+            placeholder="התחילי להקליד כדי לחפש ארגון..."
+            value={orgQuery}
+            onChange={(e) => setOrgQuery(e.target.value)}
+            disabled={loadingOrgs}
+          />
+
           <Select value={orgId} onValueChange={setOrgId} disabled={loadingOrgs}>
             <SelectTrigger>
-              <SelectValue placeholder={loadingOrgs ? "טוען ארגונים..." : "בחר ארגון"} />
+              <SelectValue
+                placeholder={loadingOrgs ? "טוען ארגונים..." : "בחר ארגון"}
+              />
             </SelectTrigger>
+
             <SelectContent>
-              {orgs.map((o) => (
-                <SelectItem key={o.id} value={o.id}>
-                  {o.name}
-                </SelectItem>
-              ))}
+              {filteredOrgs.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  לא נמצא ארגון.
+                </div>
+              ) : (
+                filteredOrgs.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>
+                    {o.name}
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
+
           <p className="text-xs text-muted-foreground">
-            אם הרגע יצרת ארגון – הוא אמור להופיע כאן.
+            אפשר לחפש ואז לבחור מהרשימה.
           </p>
         </div>
 
@@ -146,15 +181,30 @@ export default function Login() {
           />
         </div>
 
+        {/* ✅ Password + Eye */}
         <div className="space-y-2">
           <Label>סיסמה</Label>
-          <Input
-            type="password"
-            placeholder="לפחות 6 תווים"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-          />
+
+          <div className="relative">
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="לפחות 6 תווים"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              className="pl-10"
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              onMouseDown={(e) => e.preventDefault()}
+              className="absolute inset-y-0 left-2 flex items-center text-muted-foreground hover:text-foreground"
+              aria-label={showPassword ? "הסתר סיסמה" : "הצג סיסמה"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
 
         <Button className="w-full" onClick={onSubmit} disabled={!canSubmit || submitting}>

@@ -1,8 +1,8 @@
 import { userService } from "@/api/services/userService";
-import type { UserBoundary } from "@/api/types"; 
+import type { UserBoundary } from "@/api/types";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, TrendingDown } from "lucide-react";
+import { User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,12 +17,7 @@ import {
 } from "@/components/ui/select";
 
 import { cn } from "@/lib/utils";
-import {
-  calculateScore,
-  calculateSeverity,
-  SEVERITY_LABELS,
-} from "@/types/risk";
-
+import { calculateScore, calculateSeverity, SEVERITY_LABELS } from "@/types/risk";
 
 import {
   FileText,
@@ -51,9 +46,10 @@ const STEPS = [
   { id: 2, title: "קטגוריה ומיקום", icon: Tag },
   { id: 3, title: "סבירות", icon: BarChart3 },
   { id: 4, title: "השפעה", icon: Zap },
-  { id: 5, title: "אחראי וסיכון שיורי", icon: User },  
+  { id: 5, title: "אחראי וסיכון שיורי", icon: User },
   { id: 6, title: "בקרות וסיכום", icon: Shield },
 ];
+
 type Tone = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 const toneFromLevel = (level: number): Tone => {
@@ -110,12 +106,10 @@ function LevelCard(props: {
       onClick={onClick}
       className={cn(
         "group relative overflow-hidden rounded-xl border-2 p-6 text-right transition-all duration-200",
-        // תמיד “רומז” על צבע לפי רמה, ובבחירה ממלא רקע
         s.border,
         selected ? cn(s.softBg, "shadow-glow") : "bg-background hover:bg-muted/40"
       )}
     >
-      {/* פס צבע קטן למעלה כמו אינדיקציה */}
       <div className={cn("absolute inset-x-0 top-0 h-1", s.solidBg)} />
 
       <div className="flex items-start justify-between gap-4">
@@ -124,13 +118,10 @@ function LevelCard(props: {
             {title}
           </div>
           {description && (
-            <div className="mt-1 text-xs text-muted-foreground">
-              {description}
-            </div>
+            <div className="mt-1 text-xs text-muted-foreground">{description}</div>
           )}
         </div>
 
-        {/* עיגול מספר בצבע הרמה */}
         <div
           className={cn(
             "flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 text-xl font-bold transition",
@@ -211,7 +202,8 @@ export default function NewRisk() {
   });
 
   const [draftTasks, setDraftTasks] = useState<
-  Array<Omit<CreateTaskBoundary, "orgId" | "riskId">>>([]);
+    Array<Omit<CreateTaskBoundary, "orgId" | "riskId">>
+  >([]);
 
   const [draftTaskForm, setDraftTaskForm] = useState({
     title: "",
@@ -223,40 +215,38 @@ export default function NewRisk() {
   function addDraftTask() {
     if (!draftTaskForm.title.trim() || !draftTaskForm.description.trim()) return;
 
-    setDraftTasks(prev => [
+    setDraftTasks((prev) => [
       ...prev,
       {
         title: draftTaskForm.title.trim(),
         description: draftTaskForm.description.trim(),
         assigneeUserId: draftTaskForm.assigneeUserId.trim() || undefined,
-        dueDate: draftTaskForm.dueDate ? new Date(`${draftTaskForm.dueDate}T00:00:00`).toISOString() : undefined,
-      }
+        dueDate: draftTaskForm.dueDate
+          ? new Date(`${draftTaskForm.dueDate}T00:00:00`).toISOString()
+          : undefined,
+      },
     ]);
 
     setDraftTaskForm({ title: "", description: "", assigneeUserId: "", dueDate: "" });
   }
 
   function removeDraftTask(idx: number) {
-    setDraftTasks(prev => prev.filter((_, i) => i !== idx));
+    setDraftTasks((prev) => prev.filter((_, i) => i !== idx));
   }
 
   const [categories, setCategories] = useState<CategoryBoundary[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
-  const {
-    frequencyMap,
-    severityMap,
-    loading: matrixLoading,
-    error: matrixError,
-  } = useRiskMatrix(orgId);
+
+  const { frequencyMap, severityMap, loading: matrixLoading, error: matrixError } =
+    useRiskMatrix(orgId);
 
   const score = calculateScore(formData.likelihood, formData.impact);
   const severity =
     formData.likelihood && formData.impact ? calculateSeverity(score) : null;
-  const residualScore = calculateScore(formData.frequencyAfter, formData.severityAfter);
-  const residualSeverity =
-    formData.frequencyAfter && formData.severityAfter 
-    ? calculateSeverity(residualScore)
-    : null;
+
+  // ✅ progress לחיבור הפס
+  const progress = STEPS.length <= 1 ? 0 : (currentStep - 1) / (STEPS.length - 1);
+
   // --- Fetch categories from server ---
   const fetchCategories = async () => {
     if (!orgId) {
@@ -278,17 +268,16 @@ export default function NewRisk() {
       setCategories(activeSorted);
     } catch (e: any) {
       const msg =
-        e?.response?.data?.message ||
-        e?.message ||
-        "לא ניתן למשוך קטגוריות מהשרת";
+        e?.response?.data?.message || e?.message || "לא ניתן למשוך קטגוריות מהשרת";
       toast.error("שגיאה בטעינת קטגוריות", { description: msg });
     } finally {
       setCategoriesLoading(false);
     }
   };
+
   useEffect(() => {
     setCategories([]);
-    setFormData((p) => ({ ...p, categoryCode: "" })); // מומלץ כדי לא להשאיר קטגוריה מארגון אחר
+    setFormData((p) => ({ ...p, categoryCode: "" }));
   }, [orgId]);
 
   // Load categories when entering step 2 (once)
@@ -301,29 +290,28 @@ export default function NewRisk() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);
 
-const canProceed = () => {
-  switch (currentStep) {
-    case 1:
-      return formData.title.length >= 5 && formData.description.length >= 10;
-    case 2:
-      return formData.categoryCode !== "";
-    case 3:
-      return formData.likelihood > 0;
-    case 4:
-      return formData.impact > 0;
-    case 5:
-      return (
-        formData.riskManagerUserId !== "" &&
-        formData.frequencyAfter > 0 &&
-        formData.severityAfter > 0
-      );
-    case 6:
-      return true;
-    default:
-      return false;
-  }
-};
-
+  const canProceed = () => {
+    switch (currentStep) {
+      case 1:
+        return formData.title.length >= 5 && formData.description.length >= 10;
+      case 2:
+        return formData.categoryCode !== "";
+      case 3:
+        return formData.likelihood > 0;
+      case 4:
+        return formData.impact > 0;
+      case 5:
+        return (
+          formData.riskManagerUserId !== "" &&
+          formData.frequencyAfter > 0 &&
+          formData.severityAfter > 0
+        );
+      case 6:
+        return true;
+      default:
+        return false;
+    }
+  };
 
   const handleNext = async () => {
     if (submitting) return;
@@ -347,23 +335,18 @@ const canProceed = () => {
 
       const payload: CreateRiskBoundary = {
         orgId: orgId,
-
         title: formData.title,
         description: formData.description,
         categoryCode: formData.categoryCode,
-
         frequencyLevel: formData.likelihood,
         severityLevel: formData.impact,
-
         riskManagerUserId: formData.riskManagerUserId || undefined,
         frequencyAfter: formData.frequencyAfter,
         severityAfter: formData.severityAfter,
-
         location: formData.siteName || undefined,
         notes: formData.notes || undefined,
       };
 
-      //await riskService.create(payload);
       const createdRisk = await riskService.create(payload);
 
       if (draftTasks.length > 0) {
@@ -381,14 +364,11 @@ const canProceed = () => {
             )
           );
         } catch (e) {
-          // לא מפילים את כל יצירת הסיכון על משימות – רק מודיעים
           toast.error("הסיכון נוצר, אבל חלק מהמשימות לא נשמרו", {
             description: "נסי להוסיף את המיטיגציות מתוך פירוט הסיכון.",
           });
         }
       }
-
-
 
       toast.success("הסיכון נוצר בהצלחה!", {
         description: `${formData.title} - ציון ${score}`,
@@ -396,8 +376,7 @@ const canProceed = () => {
 
       navigate("/risks");
     } catch (err: any) {
-      const msg =
-        err?.response?.data?.message || err?.message || "שגיאה לא ידועה";
+      const msg = err?.response?.data?.message || err?.message || "שגיאה לא ידועה";
       toast.error("יצירת הסיכון נכשלה", { description: msg });
     } finally {
       setSubmitting(false);
@@ -417,6 +396,7 @@ const canProceed = () => {
           מלא את הפרטים הבאים ליצירת סיכון חדש במערכת
         </p>
       </div>
+
       {matrixError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
           לא הצלחתי לטעון מטריצת סיכונים לארגון. ({matrixError})
@@ -429,50 +409,53 @@ const canProceed = () => {
         </div>
       )}
 
-      {/* Steps indicator */}
+      {/* ✅ Steps indicator (פס מלא עד הסוף) */}
       <div className="card-elevated p-4">
-        <div className="flex items-center justify-between">
-          {STEPS.map((step, index) => (
-            <div key={step.id} className="flex items-center">
-              <div
-                className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300",
-                  currentStep === step.id
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : currentStep > step.id
-                    ? "border-risk-low bg-risk-low text-white"
-                    : "border-border bg-background text-muted-foreground"
-                )}
-              >
-                {currentStep > step.id ? (
-                  <Check className="h-5 w-5" />
-                ) : (
-                  <step.icon className="h-5 w-5" />
-                )}
-              </div>
-              <span
-                className={cn(
-                  "mr-2 hidden text-sm font-medium sm:block",
-                  currentStep === step.id
-                    ? "text-primary"
-                    : currentStep > step.id
-                    ? "text-risk-low"
-                    : "text-muted-foreground"
-                )}
-              >
-                {step.title}
-              </span>
+        <div className="relative">
+          {/* פס רקע מלא */}
+          <div className="absolute left-5 right-5 top-5 h-0.5 rounded bg-border" />
 
-              {index < STEPS.length - 1 && (
+          {/* פס התקדמות */}
+          <div
+            className="absolute left-5 right-5 top-5 h-0.5 rounded bg-risk-low origin-right transition-transform duration-300"
+            style={{ transform: `scaleX(${Math.max(0, Math.min(1, progress))})` }}
+          />
+
+          <div className="relative flex items-start justify-between">
+            {STEPS.map((step) => (
+              <div key={step.id} className="flex flex-col items-center gap-2">
                 <div
                   className={cn(
-                    "mx-4 h-0.5 w-8 rounded transition-colors duration-300",
-                    currentStep > step.id ? "bg-risk-low" : "bg-border"
+                    "flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300",
+                    currentStep === step.id
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : currentStep > step.id
+                      ? "border-risk-low bg-risk-low text-white"
+                      : "border-border bg-background text-muted-foreground"
                   )}
-                />
-              )}
-            </div>
-          ))}
+                >
+                  {currentStep > step.id ? (
+                    <Check className="h-5 w-5" />
+                  ) : (
+                    <step.icon className="h-5 w-5" />
+                  )}
+                </div>
+
+                <span
+                  className={cn(
+                    "text-xs font-medium text-center",
+                    currentStep === step.id
+                      ? "text-primary"
+                      : currentStep > step.id
+                      ? "text-risk-low"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {step.title}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -487,9 +470,7 @@ const canProceed = () => {
                 id="title"
                 placeholder="לדוגמה: ענף עץ על המסילה באזור נתניה"
                 value={formData.title}
-                onChange={(e) =>
-                  setFormData({ ...formData, title: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
                 תאר את הסיכון בקצרה (לפחות 5 תווים)
@@ -527,8 +508,6 @@ const canProceed = () => {
                 }
                 onOpenChange={(open) => {
                   if (!open) return;
-
-                  // Lazy-load categories when user opens the dropdown
                   if (!categoriesLoading && categories.length === 0) {
                     fetchCategories();
                   }
@@ -536,17 +515,13 @@ const canProceed = () => {
               >
                 <SelectTrigger>
                   <SelectValue
-                    placeholder={
-                      categoriesLoading ? "טוען קטגוריות..." : "בחר קטגוריה"
-                    }
+                    placeholder={categoriesLoading ? "טוען קטגוריות..." : "בחר קטגוריה"}
                   />
                 </SelectTrigger>
 
                 <SelectContent>
                   {categoriesLoading && (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">
-                      טוען...
-                    </div>
+                    <div className="px-3 py-2 text-sm text-muted-foreground">טוען...</div>
                   )}
 
                   {!categoriesLoading && categories.length === 0 && (
@@ -638,7 +613,6 @@ const canProceed = () => {
               </p>
             </div>
 
-            {/* ✅ כאן ה-Select */}
             <Select
               value={formData.riskManagerUserId}
               onValueChange={(value) =>
@@ -646,7 +620,7 @@ const canProceed = () => {
               }
               onOpenChange={(open) => {
                 if (!open) return;
-                if (!usersLoading && users.length === 0) fetchUsers(); // Lazy-load
+                if (!usersLoading && users.length === 0) fetchUsers();
               }}
             >
               <SelectTrigger>
@@ -713,18 +687,14 @@ const canProceed = () => {
           </div>
         )}
 
-
         {/* Step 6: Summary */}
         {currentStep === 6 && (
           <div className="space-y-6">
             <div>
               <Label className="text-lg font-semibold">סיכום</Label>
-              <p className="text-sm text-muted-foreground">
-                בדוק את הפרטים לפני יצירת הסיכון
-              </p>
+              <p className="text-sm text-muted-foreground">בדוק את הפרטים לפני יצירת הסיכון</p>
             </div>
 
-            {/* Risk Score Display */}
             {severity && (
               <div
                 className={cn(
@@ -736,15 +706,11 @@ const canProceed = () => {
                 )}
               >
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    ציון סיכון
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground">ציון סיכון</p>
                   <p className="text-4xl font-bold">{score}</p>
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    רמת חומרה
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground">רמת חומרה</p>
                   <p
                     className={cn(
                       "text-2xl font-bold",
@@ -760,43 +726,48 @@ const canProceed = () => {
               </div>
             )}
 
-            {/* Summary details */}
             <div className="space-y-4 rounded-lg bg-muted/50 p-4">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">כותרת:</span>
                 <span className="font-medium">{formData.title}</span>
               </div>
+
               <div className="flex justify-between">
                 <span className="text-muted-foreground">קטגוריה:</span>
                 <span className="font-medium">
-                  {categories.find((c) => c.code === formData.categoryCode)
-                    ?.name || formData.categoryCode}
+                  {categories.find((c) => c.code === formData.categoryCode)?.name ||
+                    formData.categoryCode}
                 </span>
               </div>
+
               <div className="flex justify-between">
                 <span className="text-muted-foreground">מיקום:</span>
-                <span className="font-medium">
-                  {formData.siteName || "לא צוין"}
-                </span>
+                <span className="font-medium">{formData.siteName || "לא צוין"}</span>
               </div>
+
               <div className="flex justify-between">
                 <span className="text-muted-foreground">סבירות:</span>
                 <span className="font-medium">
-                  {(frequencyMap[formData.likelihood]?.label ?? `רמה ${formData.likelihood}`)} ({formData.likelihood})
+                  {frequencyMap[formData.likelihood]?.label ?? `רמה ${formData.likelihood}`} (
+                  {formData.likelihood})
                 </span>
-
               </div>
+
               <div className="flex justify-between">
                 <span className="text-muted-foreground">השפעה:</span>
                 <span className="font-medium">
-                  {(severityMap[formData.impact]?.label ?? `רמה ${formData.impact}`)} ({formData.impact})
+                  {severityMap[formData.impact]?.label ?? `רמה ${formData.impact}`} (
+                  {formData.impact})
                 </span>
               </div>
+
               <div className="flex justify-between">
                 <span className="text-muted-foreground">אחראי:</span>
                 <span className="font-medium">
-                  {users.find(u => u.id === formData.riskManagerUserId)
-                    ? `${users.find(u => u.id === formData.riskManagerUserId)!.firstName} ${users.find(u => u.id === formData.riskManagerUserId)!.lastName}`
+                  {users.find((u) => u.id === formData.riskManagerUserId)
+                    ? `${users.find((u) => u.id === formData.riskManagerUserId)!.firstName} ${
+                        users.find((u) => u.id === formData.riskManagerUserId)!.lastName
+                      }`
                     : "לא נבחר"}
                 </span>
               </div>
@@ -804,37 +775,40 @@ const canProceed = () => {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">סבירות אחרי:</span>
                 <span className="font-medium">
-                  {(frequencyMap[formData.frequencyAfter]?.label ?? `רמה ${formData.frequencyAfter}`)} ({formData.frequencyAfter})
+                  {frequencyMap[formData.frequencyAfter]?.label ??
+                    `רמה ${formData.frequencyAfter}`}{" "}
+                  ({formData.frequencyAfter})
                 </span>
               </div>
 
               <div className="flex justify-between">
                 <span className="text-muted-foreground">השפעה אחרי:</span>
                 <span className="font-medium">
-                  {(severityMap[formData.severityAfter]?.label ?? `רמה ${formData.severityAfter}`)} ({formData.severityAfter})
+                  {severityMap[formData.severityAfter]?.label ??
+                    `רמה ${formData.severityAfter}`}{" "}
+                  ({formData.severityAfter})
                 </span>
               </div>
-
             </div>
 
-            {/* Notes */}
             <div className="space-y-2">
               <Label htmlFor="notes">הערות נוספות</Label>
               <Textarea
                 id="notes"
                 placeholder="הערות או פרטים נוספים..."
                 value={formData.notes}
-                onChange={(e) =>
-                  setFormData({ ...formData, notes: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
               />
             </div>
+
             <div className="rounded-xl border p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="font-semibold">מיטיגציות (משימות)</div>
-                  <div className="text-sm text-muted-foreground">לא חובה — אפשר גם אחרי יצירת הסיכון</div>
+                  <div className="text-sm text-muted-foreground">
+                    לא חובה — אפשר גם אחרי יצירת הסיכון
+                  </div>
                 </div>
                 <div className="text-sm text-muted-foreground">סה״כ: {draftTasks.length}</div>
               </div>
@@ -844,7 +818,9 @@ const canProceed = () => {
                   <Label>כותרת</Label>
                   <Input
                     value={draftTaskForm.title}
-                    onChange={(e) => setDraftTaskForm(s => ({ ...s, title: e.target.value }))}
+                    onChange={(e) =>
+                      setDraftTaskForm((s) => ({ ...s, title: e.target.value }))
+                    }
                     placeholder="לדוגמה: הצבת גידור זמני"
                   />
                 </div>
@@ -853,7 +829,9 @@ const canProceed = () => {
                   <Label>תיאור</Label>
                   <Textarea
                     value={draftTaskForm.description}
-                    onChange={(e) => setDraftTaskForm(s => ({ ...s, description: e.target.value }))}
+                    onChange={(e) =>
+                      setDraftTaskForm((s) => ({ ...s, description: e.target.value }))
+                    }
                     rows={3}
                     placeholder="מה בדיוק עושים?"
                   />
@@ -864,7 +842,9 @@ const canProceed = () => {
                     <Label>אחראי (UserId)</Label>
                     <Input
                       value={draftTaskForm.assigneeUserId}
-                      onChange={(e) => setDraftTaskForm(s => ({ ...s, assigneeUserId: e.target.value }))}
+                      onChange={(e) =>
+                        setDraftTaskForm((s) => ({ ...s, assigneeUserId: e.target.value }))
+                      }
                       placeholder="אופציונלי"
                     />
                   </div>
@@ -874,7 +854,9 @@ const canProceed = () => {
                     <Input
                       type="date"
                       value={draftTaskForm.dueDate}
-                      onChange={(e) => setDraftTaskForm(s => ({ ...s, dueDate: e.target.value }))}
+                      onChange={(e) =>
+                        setDraftTaskForm((s) => ({ ...s, dueDate: e.target.value }))
+                      }
                     />
                   </div>
                 </div>
@@ -907,22 +889,26 @@ const canProceed = () => {
                 )}
               </div>
             </div>
-
-
           </div>
         )}
       </div>
 
       {/* Navigation buttons */}
       <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={handleBack} disabled={currentStep === 1 || submitting}>
+        <Button
+          variant="outline"
+          onClick={handleBack}
+          disabled={currentStep === 1 || submitting}
+        >
           <ArrowRight className="ml-2 h-4 w-4" />
           הקודם
         </Button>
 
         <Button onClick={handleNext} disabled={!canProceed() || submitting}>
           {submitting ? "שומר..." : currentStep === STEPS.length ? "צור סיכון" : "הבא"}
-          {currentStep < STEPS.length && !submitting && <ArrowLeft className="mr-2 h-4 w-4" />}
+          {currentStep < STEPS.length && !submitting && (
+            <ArrowLeft className="mr-2 h-4 w-4" />
+          )}
         </Button>
       </div>
     </div>
