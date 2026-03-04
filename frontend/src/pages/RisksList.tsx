@@ -1,26 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-
+import { userService } from "@/api/services/userService";
+import type { UserBoundary } from "@/api/types";
 import { riskService } from "@/api/services/riskService";
-import { organizationService } from "@/api/services/organizationService"; 
+import { organizationService } from "@/api/services/organizationService";
 import { getCurrentOrgId } from "@/api/config";
-import type { RiskBoundary, RiskClassification, RiskStatus , CategoryBoundary } from "@/api/types";
+import type {
+  RiskBoundary,
+  RiskClassification,
+  RiskStatus,
+  CategoryBoundary,
+} from "@/api/types";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { RiskDrawer } from "@/components/risks/RiskDrawer";
 import { RiskTable } from "@/components/risks/RiskTable";
 
 function toUiSeverity(c: RiskClassification) {
   switch (c) {
-    case "EXTREME_RED": return "קריטי";
-    case "HIGH_ACTION_ORANGE": return "גבוה -נדרש טיפול";
-    case "TOLERABLE_YELLOW": return "בינוני- נסבל";
-    case "NEGLIGIBLE_GREEN": return "נמוך-זניח";
+    case "EXTREME_RED":
+      return "קריטי";
+    case "HIGH_ACTION_ORANGE":
+      return "גבוה - נדרש טיפול";
+    case "TOLERABLE_YELLOW":
+      return "בינוני - נסבל";
+    case "NEGLIGIBLE_GREEN":
+      return "נמוך - זניח";
   }
 }
-
 
 function toUiStatus(s: RiskStatus) {
   switch (s) {
@@ -53,8 +61,8 @@ export default function RisksList() {
   const [loading, setLoading] = useState(false);
   const [categoryNameByCode, setCategoryNameByCode] = useState<Record<string, string>>({});
 
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedRiskId, setSelectedRiskId] = useState<string | null>(null);
+  // ✅ שורה מתרחבת במקום Drawer
+  const [expandedRiskId, setExpandedRiskId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
 
@@ -62,6 +70,16 @@ export default function RisksList() {
   const [scoreFilter, setScoreFilter] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<RiskStatus | null>(null);
 
+  const [users, setUsers] = useState<UserBoundary[]>([]);
+
+  const userLabelById = useMemo(() => {
+    const m: Record<string, string> = {};
+    users.forEach((u) => {
+      const full = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
+      m[u.id] = full || u.email || u.id;
+    });
+    return m;
+  }, [users]);
   useEffect(() => {
     const c = searchParams.get("classification");
     setClassificationFilter(c && isRiskClassification(c) ? c : null);
@@ -75,6 +93,9 @@ export default function RisksList() {
   }, [searchParams]);
 
   useEffect(() => {
+    // אם מתנתקים/מתחברים לארגון אחר - סוגרים הרחבה
+    setExpandedRiskId(null);
+
     if (!orgId) {
       setRisks([]);
       setCategoryNameByCode({});
@@ -84,10 +105,18 @@ export default function RisksList() {
     (async () => {
       setLoading(true);
       try {
-        const [risksRes, catsRes] = await Promise.allSettled([
+        const [risksRes, catsRes, usersRes] = await Promise.allSettled([
           riskService.list({ orgId }),
           organizationService.listCategories(orgId),
+          userService.list({ orgId }),
         ]);
+
+        if (usersRes.status === "fulfilled") {
+          setUsers(usersRes.value);
+        } else {
+          console.error("RisksList load users failed", usersRes.reason);
+          setUsers([]);
+        }
 
         if (risksRes.status === "fulfilled") {
           setRisks(risksRes.value);
@@ -135,9 +164,8 @@ export default function RisksList() {
     setSearchParams({});
   }
 
-  function openRiskDrawer(riskId: string) {
-    setSelectedRiskId(riskId);
-    setDrawerOpen(true);
+  function toggleExpand(riskId: string | null) {
+    setExpandedRiskId(riskId);
   }
 
   if (!orgId) {
@@ -172,12 +200,18 @@ export default function RisksList() {
 
       <div className="flex flex-wrap gap-2 items-center rounded-xl border p-3">
         <div className="flex-1 min-w-[240px]">
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="חיפוש סיכונים..." />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="חיפוש סיכונים..."
+          />
         </div>
 
         {(classificationFilter || scoreFilter !== null || statusFilter) && (
           <div className="flex flex-wrap items-center gap-2">
-            {classificationFilter && <Badge variant="outline">סיווג: {toUiSeverity(classificationFilter)}</Badge>}
+            {classificationFilter && (
+              <Badge variant="outline">סיווג: {toUiSeverity(classificationFilter)}</Badge>
+            )}
             {scoreFilter !== null && <Badge variant="outline">מדד: {scoreFilter}</Badge>}
             {statusFilter && <Badge variant="outline">סטטוס: {toUiStatus(statusFilter)}</Badge>}
 
@@ -189,13 +223,17 @@ export default function RisksList() {
       </div>
 
       <RiskTable
+        orgId={orgId}
         risks={filteredRisks}
-        categoryNameByCode={categoryNameByCode}  
-        onViewRisk={(riskId: string) => openRiskDrawer(riskId)}
-        onEditRisk={(riskId: string) => nav(`/risks/${riskId}/edit`)}
+        categoryNameByCode={categoryNameByCode}
+        userLabelById={userLabelById}
+        expandedRiskId={expandedRiskId}
+        onToggleExpand={toggleExpand}
+        onEditRisk={(riskId) => nav(`/risks/${riskId}/edit`)}
+        onRiskUpdated={(updated) =>
+          setRisks((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
+        }
       />
-
-      <RiskDrawer open={drawerOpen} onOpenChange={setDrawerOpen} riskId={selectedRiskId} />
     </div>
   );
 }

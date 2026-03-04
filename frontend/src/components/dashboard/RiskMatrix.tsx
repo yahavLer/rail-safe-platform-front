@@ -62,25 +62,25 @@ export function RiskMatrix({ risks, matrix, onCellClick }: RiskMatrixProps) {
           <div className="grid grid-cols-5 gap-1">
             {/* Header row */}
             <div />
-            {severityLevels.map((sev) => (
-              <div
-                key={`header-${sev.level}`}
-                className="flex h-12 items-center justify-center text-xs font-medium text-muted-foreground"
-                title={sev.description || undefined}
-              >
-                {sev.label}
-              </div>
-            ))}
+              {severityLevels.map((sev) => (
+                <div
+                  key={`header-${sev.level}`}
+                  className="flex h-12 flex-col items-center justify-center text-xs font-medium text-muted-foreground"
+                  title={sev.description || undefined}
+                >
+                  <span>{sev.label} ({sev.level})</span>
+                  </div>
+              ))}
 
             {/* Rows */}
             {frequencyLevelsDesc.map((freq) => (
               <Fragment key={`row-${freq.level}`}>
                 {/* Row label */}
                 <div
-                  className="flex h-20 items-center justify-center text-xs font-medium text-muted-foreground"
+                  className="flex h-20 flex-col items-center justify-center gap-2 text-xs font-medium text-muted-foreground"
                   title={freq.description || undefined}
                 >
-                  {freq.label}
+                  <span>{freq.label} ({freq.level})</span>
                 </div>
 
                 {/* Cells */}

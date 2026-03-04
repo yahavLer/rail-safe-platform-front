@@ -1,7 +1,7 @@
 // src/pages/UsersPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, Plus } from "lucide-react";
+import { Users, Plus, Eye, EyeOff } from "lucide-react";
 
 import { getCurrentOrgId } from "@/api/config";
 import { userService } from "@/api/services/userService";
@@ -41,7 +41,7 @@ export default function UsersPage() {
 
   // ✅ orgId דינמי לפי הארגון המחובר כרגע
   const orgId = getCurrentOrgId();
-
+  const [showPassword, setShowPassword] = useState(false);
   const [users, setUsers] = useState<UserBoundary[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -146,6 +146,7 @@ export default function UsersPage() {
       setUsers((p) => [created, ...p]);
       setOpen(false);
       setForm({ firstName: "", lastName: "", email: "", role: "EMPLOYEE", password: "" });
+      setShowPassword(false);
     } catch (e) {
       console.error(e);
       setErr("נכשלה יצירת משתמש. ייתכן שהשרת מצפה לשדות אחרים.");
@@ -266,7 +267,13 @@ export default function UsersPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) setShowPassword(false);
+        }}
+      >
         <DialogContent className="sm:max-w-[640px]">
           <DialogHeader>
             <DialogTitle>הוספת משתמש</DialogTitle>
@@ -275,16 +282,28 @@ export default function UsersPage() {
           <div className="grid gap-3">
             <div className="grid gap-1">
               <label className="text-sm text-muted-foreground">שם פרטי</label>
-              <Input value={form.firstName} onChange={(e) => setForm((p) => ({ ...p, firstName: e.target.value }))} />
+              <Input
+                value={form.firstName}
+                onChange={(e) => setForm((p) => ({ ...p, firstName: e.target.value }))}
+              />
             </div>
+
             <div className="grid gap-1">
               <label className="text-sm text-muted-foreground">שם משפחה</label>
-              <Input value={form.lastName} onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))} />
+              <Input
+                value={form.lastName}
+                onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))}
+              />
             </div>
+
             <div className="grid gap-1">
               <label className="text-sm text-muted-foreground">מייל</label>
-              <Input value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
+              <Input
+                value={form.email}
+                onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+              />
             </div>
+
             <div className="grid gap-1">
               <label className="text-sm text-muted-foreground">תפקיד</label>
               <select
@@ -298,10 +317,29 @@ export default function UsersPage() {
                 <option value="EMPLOYEE">עובד</option>
               </select>
             </div>
+
             <div className="grid gap-1">
-              <label className="text-sm text-muted-foreground">סיסמה (אופציונלי)</label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-muted-foreground">סיסמה (אופציונלי)</label>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setShowPassword((p) => !p)}
+                  aria-label={showPassword ? "הסתר סיסמה" : "הצג סיסמה"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+
               <Input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={form.password}
                 onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
               />
@@ -309,10 +347,17 @@ export default function UsersPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>ביטול</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              ביטול
+            </Button>
             <Button
               onClick={createUser}
-              disabled={!orgId || !form.firstName.trim() || !form.lastName.trim() || !form.email.trim()}
+              disabled={
+                !orgId ||
+                !form.firstName.trim() ||
+                !form.lastName.trim() ||
+                !form.email.trim()
+              }
             >
               יצירה
             </Button>

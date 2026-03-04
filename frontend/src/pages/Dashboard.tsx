@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { RiskMatrix } from "@/components/dashboard/RiskMatrix";
 import { RecentRisks } from "@/components/dashboard/RecentRisks";
-import { RiskDrawer } from "@/components/risks/RiskDrawer";
 
 import {
   AlertTriangle,
@@ -26,8 +25,13 @@ import type {
   RiskClassification,
 } from "@/api/types";
 
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { RiskInlineDetails } from "@/components/risks/RiskInlineDetails";
+
 export default function Dashboard() {
   const nav = useNavigate();
+
+  const orgId = getCurrentOrgId();
 
   const [risks, setRisks] = useState<RiskBoundary[]>([]);
   const [matrix, setMatrix] = useState<RiskMatrixBoundary | null>(null);
@@ -37,16 +41,16 @@ export default function Dashboard() {
   const [byClassification, setByClassification] =
     useState<Record<RiskClassification, number>>({} as any);
 
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // ✅ Dialog במקום Drawer
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedRiskId, setSelectedRiskId] = useState<string | null>(null);
 
-  function openRiskDrawer(riskId: string) {
+  function openRiskDetails(riskId: string) {
     setSelectedRiskId(riskId);
-    setDrawerOpen(true);
+    setDetailsOpen(true);
   }
 
   useEffect(() => {
-    const orgId = getCurrentOrgId();
     if (!orgId) {
       nav("/login");
       return;
@@ -72,7 +76,7 @@ export default function Dashboard() {
         setLoading(false);
       }
     })();
-  }, [nav]);
+  }, [nav, orgId]);
 
   const stats = useMemo(() => {
     const totalRisks = risks.length;
@@ -82,13 +86,10 @@ export default function Dashboard() {
     const mediumRisks = byClassification["TOLERABLE_YELLOW"] ?? 0;
     const lowRisks = byClassification["NEGLIGIBLE_GREEN"] ?? 0;
 
-
     const mitigationPlanned = byStatus["MITIGATION_PLANNED"] ?? 0;
     const inProgress = byStatus["IN_PROGRESS"] ?? 0;
 
-    // אם עדיין אין SLA אצלך — נשאר 0
     const overdueRisks = 0;
-
     const closed = byStatus["CLOSED"] ?? 0;
 
     return {
@@ -125,8 +126,6 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-
-
         <StatsCard
           title="סה״כ סיכונים קריטיים"
           value={stats.criticalRisks}
@@ -148,7 +147,7 @@ export default function Dashboard() {
           value={stats.mediumRisks}
           icon={AlertTriangle}
           variant="medium"
-          onClick={() => goToRisks({ classification: "MEDIUM_YELLOW" })}
+          onClick={() => goToRisks({ classification: "TOLERABLE_YELLOW" })}
         />
 
         <StatsCard
@@ -156,8 +155,8 @@ export default function Dashboard() {
           value={stats.lowRisks}
           icon={AlertTriangle}
           variant="low"
-          onClick={() => goToRisks({ classification: "LOW_GREEN" })}
-        />        
+          onClick={() => goToRisks({ classification: "NEGLIGIBLE_GREEN" })}
+        />
 
         <StatsCard
           title="סה״כ סיכונים"
@@ -198,14 +197,28 @@ export default function Dashboard() {
           onCellClick={(likelihood, impact) => goToRisks({ score: likelihood * impact })}
         />
 
-        <RecentRisks risks={risks} onRiskClick={openRiskDrawer} />
+        {/* ✅ במקום openRiskDrawer */}
+        <RecentRisks risks={risks} onRiskClick={openRiskDetails} />
       </div>
 
-      <RiskDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        riskId={selectedRiskId}
-      />
+      {/* ✅ Dialog פירוט */}
+      <Dialog
+        open={detailsOpen}
+        onOpenChange={(v) => {
+          setDetailsOpen(v);
+          if (!v) setSelectedRiskId(null);
+        }}
+      >
+        <DialogContent className="max-w-[1200px] p-0 max-h-[85vh] overflow-y-auto">
+          {orgId && selectedRiskId ? (
+            <RiskInlineDetails
+              orgId={orgId}
+              riskId={selectedRiskId}
+              onClose={() => setDetailsOpen(false)}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

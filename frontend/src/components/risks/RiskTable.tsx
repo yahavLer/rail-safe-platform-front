@@ -1,5 +1,10 @@
+import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { RiskBoundary, RiskClassification, RiskStatus } from "@/api/types";
+import { riskService } from "@/api/services/riskService";
+
+import { cn } from "@/lib/utils";
+import { Eye, Edit, MapPin, Bot, Image as ImageIcon, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,18 +15,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import { Eye, Edit, MapPin, Bot, Image as ImageIcon } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { RiskInlineDetails } from "@/components/risks/RiskInlineDetails";
 
 interface RiskTableProps {
+  orgId: string;
   risks: RiskBoundary[];
   categoryNameByCode?: Record<string, string>;
+  userLabelById?: Record<string, string>;
 
-  /** Opens drawer (preferred). If not provided, falls back to Link navigation. */
-  onViewRisk?: (riskId: string) => void;
+  expandedRiskId: string | null;
+  onToggleExpand: (riskId: string | null) => void;
 
-  /** Optional: if you want to control edit navigation from parent */
   onEditRisk?: (riskId: string) => void;
+
+  /** ✅ חדש: מאפשר לעדכן את ה-state למעלה (RisksList) כדי שהטבלה + פילטרים יתעדכנו */
+  onRiskUpdated?: (updated: RiskBoundary) => void;
 }
 
 /** צבעים לפי ה־classification מהשרת */
@@ -42,11 +58,14 @@ const CLASSIFICATION_LABELS: Record<RiskClassification, string> = {
 /** סטטוסים לפי RiskStatus מהשרת */
 const statusBadgeStyles: Partial<Record<RiskStatus, string>> = {
   OPEN: "bg-status-new/10 text-status-new border-status-new/20",
-  MITIGATION_PLANNED: "bg-status-in-progress/10 text-status-in-progress border-status-in-progress/20",
-  IN_PROGRESS: "bg-status-in-progress/10 text-status-in-progress border-status-in-progress/20",
+  MITIGATION_PLANNED:
+    "bg-status-in-progress/10 text-status-in-progress border-status-in-progress/20",
+  IN_PROGRESS:
+    "bg-status-in-progress/10 text-status-in-progress border-status-in-progress/20",
   CLOSED: "bg-status-closed/10 text-status-closed border-status-closed/20",
   DRAFT: "bg-muted/30 text-muted-foreground border-muted/40",
 };
+
 const STATUS_LABELS_HE: Record<RiskStatus, string> = {
   DRAFT: "טיוטה",
   OPEN: "פתוח",
@@ -61,7 +80,49 @@ const slaStyles = {
   OVERDUE: "text-risk-critical",
 } as const;
 
-export function RiskTable({ risks,categoryNameByCode, onViewRisk, onEditRisk }: RiskTableProps) {
+export function RiskTable({
+  orgId,
+  risks,
+  categoryNameByCode,
+  userLabelById,
+  expandedRiskId,
+  onToggleExpand,
+  onEditRisk,
+  onRiskUpdated,
+}: RiskTableProps) {
+  // ✅ localRows כדי שהטבלה תתעדכן מיידית גם אם parent עוד לא ריענן
+  const [rows, setRows] = useState<RiskBoundary[]>(risks);
+  useEffect(() => {
+    setRows(risks);
+  }, [risks]);
+
+  // ✅ מצב עריכת סטטוס בשורה ספציפית
+  const [statusEditRiskId, setStatusEditRiskId] = useState<string | null>(null);
+
+  function applyRiskUpdate(updated: RiskBoundary) {
+    setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    onRiskUpdated?.(updated); // יעדכן גם את ה-state למעלה (אם העברת)
+  }
+
+  async function updateStatusFromTable(riskId: string, nextStatus: RiskStatus) {
+    const prev = rows.find((r) => r.id === riskId);
+    if (!prev) return;
+
+    // ✅ חוזר לבאדג' מיד אחרי בחירה
+    setStatusEditRiskId(null);
+
+    // ✅ optimistic
+    applyRiskUpdate({ ...prev, status: nextStatus });
+
+    try {
+      const updated = await riskService.updateStatus(riskId, { status: nextStatus });
+      applyRiskUpdate(updated);
+    } catch (e) {
+      console.error("updateStatusFromTable failed", e);
+      applyRiskUpdate(prev); // rollback
+    }
+  }
+
   return (
     <div className="card-elevated overflow-hidden">
       <Table>
@@ -81,136 +142,214 @@ export function RiskTable({ risks,categoryNameByCode, onViewRisk, onEditRisk }: 
         </TableHeader>
 
         <TableBody>
-          {risks.map((risk, index) => {
-            // שדות זמניים אם קיימים אצלך במודל עתידי/adapter
+          {rows.map((risk, index) => {
             const hasImage = Boolean((risk as any)?.imageUrl);
-            const slaStatus = (risk as any)?.slaStatus as "ON_TIME" | "AT_RISK" | "OVERDUE" | undefined;
+            const slaStatus = (risk as any)?.slaStatus as
+              | "ON_TIME"
+              | "AT_RISK"
+              | "OVERDUE"
+              | undefined;
             const aiProcessedAt = (risk as any)?.aiProcessedAt as string | undefined;
             const categoryName = categoryNameByCode?.[risk.categoryCode];
+            const isExpanded = expandedRiskId === risk.id;
 
             return (
-              <TableRow
-                key={risk.id}
-                onClick={() => onViewRisk?.(risk.id)}
-                className={cn(
-                  "transition-colors hover:bg-muted/50 animate-fade-in",
-                  index % 2 === 0 ? "bg-background" : "bg-muted/20",
-                  onViewRisk ? "cursor-pointer" : ""
-                )}
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                <TableCell className="max-w-[250px]">
-                  <div className="flex items-center gap-2">
-                    {hasImage && <ImageIcon className="h-4 w-4 text-muted-foreground" />}
-                    <span className="font-medium line-clamp-1">{risk.title}</span>
-                  </div>
-                </TableCell>
-
-                <TableCell>
-                  <span
-                    className="text-sm text-muted-foreground"
-                    title={risk.categoryCode} // משאיר את הקוד כ-tooltip
-                  >
-                    {categoryName ?? risk.categoryCode}
-                  </span>
-                </TableCell>
-
-                <TableCell className="text-center">
-                  <span className="text-lg font-bold">{risk.riskScore}</span>
-                </TableCell>
-
-                <TableCell className="text-center">
-                  <Badge
-                    variant="outline"
-                    className={cn("text-xs", classificationBadgeStyles[risk.classification])}
-                  >
-                    {CLASSIFICATION_LABELS[risk.classification]}
-                  </Badge>
-                </TableCell>
-
-                <TableCell className="text-center">
-                  <Badge
-                    variant="outline"
-                    className={cn("text-xs", statusBadgeStyles[risk.status] ?? "border-muted/40")}
-                  >
-                    {STATUS_LABELS_HE[risk.status]}
-                  </Badge>
-                </TableCell>
-
-                <TableCell>
-                  {risk.location ? (
-                    <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <MapPin className="h-3 w-3" />
-                      {risk.location}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">—</span>
+              <Fragment key={risk.id}>
+                <TableRow
+                  onClick={() => onToggleExpand(isExpanded ? null : risk.id)}
+                  className={cn(
+                    "transition-colors hover:bg-muted/50",
+                    index % 2 === 0 ? "bg-background" : "bg-muted/20",
+                    "cursor-pointer"
                   )}
-                </TableCell>
-
-                <TableCell>
-                  {/* כרגע אין שם – רק ID (בהמשך נחבר UserService כדי להביא שם) */}
-                  <span className="text-sm">
-                    {risk.riskManagerUserId ? `${risk.riskManagerUserId.slice(0, 8)}…` : "—"}
-                  </span>
-                </TableCell>
-
-                <TableCell className="text-center">
-                  {slaStatus ? (
-                    <span className={cn("text-sm font-medium", slaStyles[slaStatus])}>
-                      {slaStatus === "ON_TIME" && "בזמן"}
-                      {slaStatus === "AT_RISK" && "בסיכון"}
-                      {slaStatus === "OVERDUE" && "חריגה"}
-                    </span>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-center">
-                  {aiProcessedAt ? (
-                    <div className="flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-primary" />
+                  aria-expanded={isExpanded}
+                >
+                  <TableCell className="max-w-[250px]">
+                    <div className="flex items-center gap-2">
+                      {hasImage && (
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className="font-medium line-clamp-1">{risk.title}</span>
                     </div>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">—</span>
-                  )}
-                </TableCell>
+                  </TableCell>
 
-                <TableCell>
-                  <div dir="ltr" className="flex items-center justify-start gap-1">
-                    {/* EDIT */}
-                    {onEditRisk ? (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
+                  <TableCell>
+                    <span
+                      className="text-sm text-muted-foreground"
+                      title={risk.categoryCode}
+                    >
+                      {categoryName ?? risk.categoryCode}
+                    </span>
+                  </TableCell>
+
+                  <TableCell className="text-center">
+                    <span className="text-lg font-bold">{risk.riskScore}</span>
+                  </TableCell>
+
+                  <TableCell className="text-center">
+                    <Badge
+                      variant="outline"
+                      className={cn("text-xs", classificationBadgeStyles[risk.classification])}
+                    >
+                      {CLASSIFICATION_LABELS[risk.classification]}
+                    </Badge>
+                  </TableCell>
+
+                  {/* ✅ סטטוס: לחיצה -> Select, בחירה -> עדכון מיידי + חזרה לבאדג' */}
+                  <TableCell className="text-center">
+                    {statusEditRiskId === risk.id ? (
+                      <div
+                        className="mx-auto flex items-center justify-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="w-[180px]">
+                          <Select
+                            value={risk.status}
+                            onValueChange={(v) =>
+                              updateStatusFromTable(risk.id, v as RiskStatus)
+                            }
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="DRAFT">טיוטה</SelectItem>
+                              <SelectItem value="OPEN">פתוח</SelectItem>
+                              <SelectItem value="MITIGATION_PLANNED">תכנון מיטיגציה</SelectItem>
+                              <SelectItem value="IN_PROGRESS">בטיפול</SelectItem>
+                              <SelectItem value="CLOSED">נסגר</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setStatusEditRiskId(null)}
+                          aria-label="סגור שינוי סטטוס"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onEditRisk(risk.id);
+                          setStatusEditRiskId(risk.id);
                         }}
-                        aria-label="עריכת סיכון"
+                        className="focus:outline-none"
+                        title="לחצי לשינוי סטטוס"
                       >
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-xs cursor-pointer",
+                            statusBadgeStyles[risk.status] ?? "border-muted/40"
+                          )}
+                        >
+                          {STATUS_LABELS_HE[risk.status]}
+                        </Badge>
+                      </button>
+                    )}
+                  </TableCell>
+
+                  <TableCell>
+                    {risk.location ? (
+                      <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <MapPin className="h-3 w-3" />
+                        {risk.location}
+                      </span>
                     ) : (
-                      <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                        <Link to={`/risks/${risk.id}/edit`} onClick={(e) => e.stopPropagation()}>
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+
+                  <TableCell>
+                    <span className="text-sm">
+                      {risk.riskManagerUserId
+                        ? userLabelById?.[risk.riskManagerUserId] ??
+                          `${risk.riskManagerUserId.slice(0, 8)}…`
+                        : "—"}
+                    </span>
+                  </TableCell>
+
+                  <TableCell className="text-center">
+                    {slaStatus ? (
+                      <span className={cn("text-sm font-medium", slaStyles[slaStatus])}>
+                        {slaStatus === "ON_TIME" && "בזמן"}
+                        {slaStatus === "AT_RISK" && "בסיכון"}
+                        {slaStatus === "OVERDUE" && "חריגה"}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+
+                  <TableCell className="text-center">
+                    {aiProcessedAt ? (
+                      <div className="flex items-center justify-center">
+                        <Bot className="h-4 w-4 text-primary" />
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+
+                  <TableCell>
+                    <div dir="ltr" className="flex items-center justify-start gap-1">
+                      {onEditRisk ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditRisk(risk.id);
+                          }}
+                          aria-label="עריכת סיכון"
+                        >
                           <Edit className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                          <Link
+                            to={`/risks/${risk.id}/edit`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      )}
+
+                      <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                        <Link to={`/risks/${risk.id}`} onClick={(e) => e.stopPropagation()}>
+                          <Eye className="h-4 w-4" />
                         </Link>
                       </Button>
-                    )}
+                    </div>
+                  </TableCell>
+                </TableRow>
 
-                    {/* VIEW -> עמוד פירוט מלא */}
-                    <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                      <Link to={`/risks/${risk.id}`} onClick={(e) => e.stopPropagation()}>
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </div>
-                </TableCell>
-
-
-              </TableRow>
+                {isExpanded && (
+                  <TableRow className="bg-muted/10">
+                    <TableCell colSpan={10} className="p-0">
+                      <div className="border-t">
+                        <RiskInlineDetails
+                          orgId={orgId}
+                          riskId={risk.id}
+                          categoryName={categoryName}
+                          onClose={() => onToggleExpand(null)}
+                          // ✅ חדש: כל עדכון מתוך החלונית יעדכן מיידית את השורה בטבלה
+                          onRiskUpdated={applyRiskUpdate}
+                        />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
             );
           })}
         </TableBody>
