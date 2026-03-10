@@ -14,7 +14,7 @@ export interface Risk {
   status: RiskStatus;
   locationLat?: number;
   locationLng?: number;
-  siteName?: string;
+  location?: string;
   imageUrl?: string;
   aiLikelihood?: number;
   aiDescription?: string;

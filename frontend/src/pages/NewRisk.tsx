@@ -187,7 +187,7 @@ export default function NewRisk() {
     title: "",
     description: "",
     categoryCode: "",
-    siteName: "",
+    location: "",
     likelihood: 0,
     impact: 0,
 
@@ -343,7 +343,7 @@ export default function NewRisk() {
         riskManagerUserId: formData.riskManagerUserId || undefined,
         frequencyAfter: formData.frequencyAfter,
         severityAfter: formData.severityAfter,
-        location: formData.siteName || undefined,
+        location: formData.location || undefined,
         notes: formData.notes || undefined,
       };
 
@@ -540,13 +540,13 @@ export default function NewRisk() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="siteName">מיקום / אתר</Label>
+              <Label htmlFor="location">מיקום / אתר</Label>
               <Input
-                id="siteName"
+                id="location"
                 placeholder="לדוגמה: תחנת באר שבע צפון, ק״מ 47 קו צפון"
-                value={formData.siteName}
+                value={formData.location}
                 onChange={(e) =>
-                  setFormData({ ...formData, siteName: e.target.value })
+                  setFormData({ ...formData, location: e.target.value })
                 }
               />
             </div>
@@ -742,7 +742,7 @@ export default function NewRisk() {
 
               <div className="flex justify-between">
                 <span className="text-muted-foreground">מיקום:</span>
-                <span className="font-medium">{formData.siteName || "לא צוין"}</span>
+                <span className="font-medium">{formData.location || "לא צוין"}</span>
               </div>
 
               <div className="flex justify-between">
