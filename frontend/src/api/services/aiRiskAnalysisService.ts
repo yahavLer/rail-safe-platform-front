@@ -9,6 +9,7 @@ export interface DraftRiskProposalBoundary {
   title: string | null;
   description: string | null;
   categoryCode: string | null;
+  categoryName: string | null;
   severityLevel: number | null;
   frequencyLevel: number | null;
   score: number | null;

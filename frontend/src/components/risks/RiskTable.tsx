@@ -4,7 +4,14 @@ import type { RiskBoundary, RiskClassification, RiskStatus } from "@/api/types";
 import { riskService } from "@/api/services/riskService";
 
 import { cn } from "@/lib/utils";
-import { Eye, Edit, MapPin, Bot, Image as ImageIcon, X } from "lucide-react";
+import {
+  Eye,
+  Edit,
+  MapPin,
+  Bot,
+  Image as ImageIcon,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,11 +43,9 @@ interface RiskTableProps {
 
   onEditRisk?: (riskId: string) => void;
 
-  /** ✅ חדש: מאפשר לעדכן את ה-state למעלה (RisksList) כדי שהטבלה + פילטרים יתעדכנו */
   onRiskUpdated?: (updated: RiskBoundary) => void;
 }
 
-/** צבעים לפי ה־classification מהשרת */
 const classificationBadgeStyles: Record<RiskClassification, string> = {
   EXTREME_RED: "bg-risk-critical-bg text-risk-critical border-risk-critical/20",
   HIGH_ACTION_ORANGE: "bg-risk-high-bg text-risk-high border-risk-high/20",
@@ -55,7 +60,6 @@ const CLASSIFICATION_LABELS: Record<RiskClassification, string> = {
   NEGLIGIBLE_GREEN: "נמוך - זניח",
 };
 
-/** סטטוסים לפי RiskStatus מהשרת */
 const statusBadgeStyles: Partial<Record<RiskStatus, string>> = {
   OPEN: "bg-status-new/10 text-status-new border-status-new/20",
   MITIGATION_PLANNED:
@@ -80,6 +84,31 @@ const slaStyles = {
   OVERDUE: "text-risk-critical",
 } as const;
 
+function RiskImageThumbnail({ imageUrl }: { imageUrl?: string }) {
+  if (!imageUrl) {
+    return <span className="text-sm text-muted-foreground">—</span>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        window.open(imageUrl, "_blank", "noopener,noreferrer");
+      }}
+      className="group inline-flex items-center gap-2"
+      title="פתחי תמונה"
+    >
+      <img
+        src={imageUrl}
+        alt="תמונת סיכון"
+        className="h-10 w-14 rounded-md border object-cover transition-opacity group-hover:opacity-90"
+      />
+      <span className="text-xs text-primary underline">צפייה</span>
+    </button>
+  );
+}
+
 export function RiskTable({
   orgId,
   risks,
@@ -90,28 +119,24 @@ export function RiskTable({
   onEditRisk,
   onRiskUpdated,
 }: RiskTableProps) {
-  // ✅ localRows כדי שהטבלה תתעדכן מיידית גם אם parent עוד לא ריענן
   const [rows, setRows] = useState<RiskBoundary[]>(risks);
+
   useEffect(() => {
     setRows(risks);
   }, [risks]);
 
-  // ✅ מצב עריכת סטטוס בשורה ספציפית
   const [statusEditRiskId, setStatusEditRiskId] = useState<string | null>(null);
 
   function applyRiskUpdate(updated: RiskBoundary) {
     setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-    onRiskUpdated?.(updated); // יעדכן גם את ה-state למעלה (אם העברת)
+    onRiskUpdated?.(updated);
   }
 
   async function updateStatusFromTable(riskId: string, nextStatus: RiskStatus) {
     const prev = rows.find((r) => r.id === riskId);
     if (!prev) return;
 
-    // ✅ חוזר לבאדג' מיד אחרי בחירה
     setStatusEditRiskId(null);
-
-    // ✅ optimistic
     applyRiskUpdate({ ...prev, status: nextStatus });
 
     try {
@@ -119,7 +144,7 @@ export function RiskTable({
       applyRiskUpdate(updated);
     } catch (e) {
       console.error("updateStatusFromTable failed", e);
-      applyRiskUpdate(prev); // rollback
+      applyRiskUpdate(prev);
     }
   }
 
@@ -137,13 +162,15 @@ export function RiskTable({
             <TableHead className="text-right font-semibold">אחראי הסיכון</TableHead>
             <TableHead className="text-center font-semibold">SLA</TableHead>
             <TableHead className="text-center font-semibold">AI</TableHead>
+            <TableHead className="text-center font-semibold">תמונה</TableHead>
             <TableHead className="text-center font-semibold">פעולות</TableHead>
           </TableRow>
         </TableHeader>
 
         <TableBody>
           {rows.map((risk, index) => {
-            const hasImage = Boolean((risk as any)?.imageUrl);
+            const sourceImageUrl = (risk as any).sourceImageUrl as string | undefined;
+            const hasImage = Boolean(sourceImageUrl);
             const slaStatus = (risk as any)?.slaStatus as
               | "ON_TIME"
               | "AT_RISK"
@@ -158,9 +185,8 @@ export function RiskTable({
                 <TableRow
                   onClick={() => onToggleExpand(isExpanded ? null : risk.id)}
                   className={cn(
-                    "transition-colors hover:bg-muted/50",
-                    index % 2 === 0 ? "bg-background" : "bg-muted/20",
-                    "cursor-pointer"
+                    "cursor-pointer transition-colors hover:bg-muted/50",
+                    index % 2 === 0 ? "bg-background" : "bg-muted/20"
                   )}
                   aria-expanded={isExpanded}
                 >
@@ -169,7 +195,7 @@ export function RiskTable({
                       {hasImage && (
                         <ImageIcon className="h-4 w-4 text-muted-foreground" />
                       )}
-                      <span className="font-medium line-clamp-1">{risk.title}</span>
+                      <span className="line-clamp-1 font-medium">{risk.title}</span>
                     </div>
                   </TableCell>
 
@@ -195,7 +221,6 @@ export function RiskTable({
                     </Badge>
                   </TableCell>
 
-                  {/* ✅ סטטוס: לחיצה -> Select, בחירה -> עדכון מיידי + חזרה לבאדג' */}
                   <TableCell className="text-center">
                     {statusEditRiskId === risk.id ? (
                       <div
@@ -246,7 +271,7 @@ export function RiskTable({
                         <Badge
                           variant="outline"
                           className={cn(
-                            "text-xs cursor-pointer",
+                            "cursor-pointer text-xs",
                             statusBadgeStyles[risk.status] ?? "border-muted/40"
                           )}
                         >
@@ -289,13 +314,17 @@ export function RiskTable({
                   </TableCell>
 
                   <TableCell className="text-center">
-                    {aiProcessedAt ? (
+                    {aiProcessedAt || hasImage ? (
                       <div className="flex items-center justify-center">
                         <Bot className="h-4 w-4 text-primary" />
                       </div>
                     ) : (
                       <span className="text-sm text-muted-foreground">—</span>
                     )}
+                  </TableCell>
+
+                  <TableCell className="text-center">
+                    <RiskImageThumbnail imageUrl={sourceImageUrl} />
                   </TableCell>
 
                   <TableCell>
@@ -335,14 +364,13 @@ export function RiskTable({
 
                 {isExpanded && (
                   <TableRow className="bg-muted/10">
-                    <TableCell colSpan={10} className="p-0">
+                    <TableCell colSpan={11} className="p-0">
                       <div className="border-t">
                         <RiskInlineDetails
                           orgId={orgId}
                           riskId={risk.id}
                           categoryName={categoryName}
                           onClose={() => onToggleExpand(null)}
-                          // ✅ חדש: כל עדכון מתוך החלונית יעדכן מיידית את השורה בטבלה
                           onRiskUpdated={applyRiskUpdate}
                         />
                       </div>

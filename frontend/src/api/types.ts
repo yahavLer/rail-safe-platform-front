@@ -115,7 +115,7 @@ export interface RiskBoundary {
 
   location?: string;
   notes?: string;
-
+  sourceImageUrl?: string;
   createdAt: string;
   updatedAt: string;
 
