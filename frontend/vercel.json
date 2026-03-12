@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/user-api/:path*", "destination": "http://35.242.136.67:8081/:path*" },
+    { "source": "/risk-api/:path*", "destination": "http://35.242.136.67:8082/:path*" },
+    { "source": "/org-api/:path*", "destination": "http://35.242.136.67:8083/:path*" },
+    { "source": "/task-api/:path*", "destination": "http://35.242.136.67:8084/:path*" },
+    { "source": "/image-api/:path*", "destination": "http://35.242.136.67:8090/:path*" }
+  ]
+}
