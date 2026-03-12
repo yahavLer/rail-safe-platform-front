@@ -41,7 +41,6 @@ export default function Dashboard() {
   const [byClassification, setByClassification] =
     useState<Record<RiskClassification, number>>({} as any);
 
-  // ✅ Dialog במקום Drawer
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedRiskId, setSelectedRiskId] = useState<string | null>(null);
 
@@ -118,14 +117,16 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="animate-fade-in">
-        <h1 className="text-3xl font-bold text-foreground">לוח בקרה</h1>
-        <p className="mt-1 text-muted-foreground">סקירה כללית של מצב הסיכונים במערכת</p>
+        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">לוח בקרה</h1>
+        <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+          סקירה כללית של מצב הסיכונים במערכת
+        </p>
         {loading && <p className="mt-2 text-sm text-muted-foreground">טוען נתונים...</p>}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <StatsCard
           title="סה״כ סיכונים קריטיים"
           value={stats.criticalRisks}
@@ -190,18 +191,16 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
         <RiskMatrix
           risks={risks}
           matrix={matrix}
           onCellClick={(likelihood, impact) => goToRisks({ score: likelihood * impact })}
         />
 
-        {/* ✅ במקום openRiskDrawer */}
         <RecentRisks risks={risks} onRiskClick={openRiskDetails} />
       </div>
 
-      {/* ✅ Dialog פירוט */}
       <Dialog
         open={detailsOpen}
         onOpenChange={(v) => {
@@ -209,7 +208,7 @@ export default function Dashboard() {
           if (!v) setSelectedRiskId(null);
         }}
       >
-        <DialogContent className="max-w-[1200px] p-0 max-h-[85vh] overflow-y-auto">
+        <DialogContent className="h-[92vh] max-w-[96vw] overflow-y-auto p-0 sm:max-h-[85vh] sm:max-w-[1200px]">
           {orgId && selectedRiskId ? (
             <RiskInlineDetails
               orgId={orgId}
