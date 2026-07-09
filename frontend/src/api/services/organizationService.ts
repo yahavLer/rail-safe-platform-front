@@ -1,4 +1,3 @@
-import axios from "axios";
 import { orgHttp } from "../http";
 import type {
   OrganizationBoundary,
@@ -12,6 +11,18 @@ import type {
 } from "../types";
 
 const BASE_PATH = "/api/organizations";
+
+type OrganizationListResponse =
+  | OrganizationBoundary[]
+  | { content?: OrganizationBoundary[]; data?: OrganizationBoundary[]; organizations?: OrganizationBoundary[] };
+
+function normalizeOrganizations(data: OrganizationListResponse): OrganizationBoundary[] {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.content)) return data.content;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.organizations)) return data.organizations;
+  return [];
+}
 
 export const organizationService = {
   // Organization CRUD
@@ -86,6 +97,8 @@ export const organizationService = {
     return { org, matrix, categories };
   },
   
-  listOrganizations: async () =>
-  (await orgHttp.get<OrganizationBoundary[]>(`${BASE_PATH}`)).data,
+  listOrganizations: async () => {
+    const response = await orgHttp.get<OrganizationListResponse>(`${BASE_PATH}`);
+    return normalizeOrganizations(response.data);
+  },
 };

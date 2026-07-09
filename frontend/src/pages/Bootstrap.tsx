@@ -10,5 +10,5 @@ export default function Bootstrap() {
   if (!orgId) return <Navigate to="/signup/org" replace />;
   if (!session) return <Navigate to="/login" replace />;
 
-  return <Navigate to="/" replace />;
+  return <Navigate to="/dashboard" replace />;
 }

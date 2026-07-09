@@ -22,6 +22,13 @@ import type { OrganizationBoundary, UserBoundary } from "@/api/types";
 
 import { Eye, EyeOff } from "lucide-react";
 
+type ApiErrorLike = { response?: { data?: { message?: string } }; message?: string };
+
+function getErrorDescription(error: unknown, fallback = "שגיאה לא ידועה") {
+  const e = error as ApiErrorLike;
+  return e.response?.data?.message || e.message || fallback;
+}
+
 export default function Login() {
   const navigate = useNavigate();
 
@@ -53,9 +60,9 @@ export default function Login() {
           else if (byName) setOrgId(byName.id);
           else setOrgId("");
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         toast.error("שגיאה בטעינת ארגונים", {
-          description: e?.response?.data?.message || e?.message || "שגיאה לא ידועה",
+          description: getErrorDescription(e),
         });
       } finally {
         setLoadingOrgs(false);
@@ -107,15 +114,10 @@ export default function Login() {
         description: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email,
       });
 
-      if (user.role === "CHIEF_RISK_MANAGER") {
-        navigate("/risk-definitions");
-      } else {
-        navigate("/dashboard");
-      }
-    } catch (e: any) {
+      navigate("/dashboard");
+    } catch (e: unknown) {
       toast.error("התחברות נכשלה", {
-        description:
-          e?.response?.data?.message || e?.message || "אימייל/סיסמה/ארגון לא נכונים",
+        description: getErrorDescription(e, "אימייל/סיסמה/ארגון לא נכונים"),
       });
     } finally {
       setSubmitting(false);

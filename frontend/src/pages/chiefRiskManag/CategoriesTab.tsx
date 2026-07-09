@@ -33,6 +33,13 @@ interface Props {
   orgId: string;
 }
 
+type ApiErrorLike = { response?: { data?: { message?: string } }; message?: string };
+
+function getErrorDescription(error: unknown, fallback = "שגיאה לא ידועה") {
+  const e = error as ApiErrorLike;
+  return e.response?.data?.message || e.message || fallback;
+}
+
 export default function CategoriesTab({ orgId }: Props) {
   const [categories, setCategories] = useState<CategoryBoundary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,25 +55,24 @@ export default function CategoriesTab({ orgId }: Props) {
       setLoading(true);
       const list = await organizationService.listCategories(orgId);
       setCategories(list.sort((a, b) => a.displayOrder - b.displayOrder));
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error("שגיאה בטעינת קטגוריות", {
-        description: e?.response?.data?.message || e?.message,
+        description: getErrorDescription(e),
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreate = async (code: string, name: string) => {
+  const handleCreate = async (name: string) => {
     try {
-      const displayOrder = categories.length + 1;
-      await organizationService.createCategory(orgId, { code, name, displayOrder });
+      await organizationService.createCategory(orgId, { name });
       toast.success("הקטגוריה נוספה בהצלחה");
       setShowCreateDialog(false);
       loadCategories();
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error("שגיאה ביצירת קטגוריה", {
-        description: e?.response?.data?.message || e?.message,
+        description: getErrorDescription(e),
       });
     }
   };
@@ -77,9 +83,9 @@ export default function CategoriesTab({ orgId }: Props) {
       toast.success("הקטגוריה עודכנה בהצלחה");
       setEditingCategory(null);
       loadCategories();
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error("שגיאה בעדכון קטגוריה", {
-        description: e?.response?.data?.message || e?.message,
+        description: getErrorDescription(e),
       });
     }
   };
@@ -89,9 +95,9 @@ export default function CategoriesTab({ orgId }: Props) {
       await organizationService.updateCategory(orgId, category.id, { active: !category.active });
       toast.success(category.active ? "הקטגוריה הושבתה" : "הקטגוריה הופעלה");
       loadCategories();
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error("שגיאה בעדכון סטטוס קטגוריה", {
-        description: e?.response?.data?.message || e?.message,
+        description: getErrorDescription(e),
       });
     }
   };
@@ -103,9 +109,9 @@ export default function CategoriesTab({ orgId }: Props) {
       await organizationService.deleteCategory(orgId, categoryId);
       toast.success("הקטגוריה נמחקה בהצלחה");
       loadCategories();
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error("שגיאה במחיקת קטגוריה", {
-        description: e?.response?.data?.message || e?.message,
+        description: getErrorDescription(e),
       });
     }
   };
@@ -231,16 +237,15 @@ export default function CategoriesTab({ orgId }: Props) {
 }
 
 // Create Category Dialog
-function CreateCategoryDialog({ onSubmit, onCancel }: { onSubmit: (code: string, name: string) => void; onCancel: () => void }) {
-  const [code, setCode] = useState("");
+function CreateCategoryDialog({ onSubmit, onCancel }: { onSubmit: (name: string) => void; onCancel: () => void }) {
   const [name, setName] = useState("");
 
   const handleSubmit = () => {
-    if (!code.trim() || !name.trim()) {
-      toast.error("יש למלא את כל השדות");
+    if (!name.trim()) {
+      toast.error("יש למלא שם קטגוריה");
       return;
     }
-    onSubmit(code.trim(), name.trim());
+    onSubmit(name.trim());
   };
 
   return (
@@ -250,17 +255,8 @@ function CreateCategoryDialog({ onSubmit, onCancel }: { onSubmit: (code: string,
         <DialogDescription>הגדר קטגוריה חדשה לסיווג סיכונים במערכת</DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
-        <div className="space-y-2">
-          <Label htmlFor="code">קוד קטגוריה</Label>
-          <Input
-            id="code"
-            placeholder='לדוגמה: "GH1"'
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            קוד ייחודי לזיהוי הקטגוריה (באנגלית, עד 10 תווים)
-          </p>
+        <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+          קוד הקטגוריה ייווצר אוטומטית על ידי המערכת ויוצג ברשימה לאחר השמירה.
         </div>
         <div className="space-y-2">
           <Label htmlFor="name">שם הקטגוריה</Label>

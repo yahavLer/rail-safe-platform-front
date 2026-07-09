@@ -37,7 +37,7 @@ export default function RiskDefinitions() {
       
       if (user.role !== "CHIEF_RISK_MANAGER") {
         toast.error("אין לך הרשאה לצפות בדף זה");
-        navigate("/");
+        navigate("/dashboard");
         return;
       }
 
@@ -50,7 +50,7 @@ export default function RiskDefinitions() {
   }, [navigate]);
 
   const handleContinueToDashboard = () => {
-    navigate("/");
+    navigate("/dashboard");
   };
 
   if (!currentUser || !orgId) {

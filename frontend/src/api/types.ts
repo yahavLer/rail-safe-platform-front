@@ -62,10 +62,7 @@ export interface CategoryBoundary {
 }
 
 export interface CreateCategoryBoundary {
-  code: string;
   name: string;
-//  description?: string;
-  //displayOrder: number;
 }
 
 export interface UpdateCategoryBoundary {

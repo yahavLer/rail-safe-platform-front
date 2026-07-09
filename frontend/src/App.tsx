@@ -4,7 +4,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
+import { RedirectIfAuthenticated, RequireAuth } from "@/auth/RequireAuth";
 import { MainLayout } from "./components/layout/MainLayout";
+import AuthLanding from "./pages/AuthLanding";
 import Dashboard from "./pages/Dashboard";
 import RisksList from "./pages/RisksList";
 import RiskDetail from "./pages/RiskDetail";
@@ -16,11 +18,11 @@ import Login from "./pages/Login";
 import Bootstrap from "./pages/Bootstrap";
 import RiskDefinitions from "./pages/chiefRiskManag/RiskDefinitions";
 import ReportsPage from "./pages/ReportsPage";
-import SettingsPage from "./pages/SettingsPage";
 import UsersPage from "./pages/UsersPage";
 import ControlsLibraryPage from "./pages/ControlsLibraryPage";
 import RiskEditPage from "./pages/RiskEditPage";
 import CreateRiskFromImagePage from "./pages/CreateRiskFromImagePage";
+import ProfilePage from "./pages/ProfilePage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,22 +43,25 @@ const App = () => (
           <Routes>
             <Route path="/start" element={<Bootstrap />} />
 
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup/org" element={<OrgSignup />} />
-            <Route path="/signup/user" element={<UserSignup />} />
-            <Route path="/risk-definitions" element={<RiskDefinitions />} />
+            <Route path="/" element={<RedirectIfAuthenticated><AuthLanding /></RedirectIfAuthenticated>} />
+            <Route path="/login" element={<RedirectIfAuthenticated><Login /></RedirectIfAuthenticated>} />
+            <Route path="/signup/org" element={<RedirectIfAuthenticated><OrgSignup /></RedirectIfAuthenticated>} />
+            <Route path="/signup/user" element={<RedirectIfAuthenticated><UserSignup /></RedirectIfAuthenticated>} />
 
-            <Route element={<MainLayout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/risks" element={<RisksList />} />
-              <Route path="/risks/new" element={<NewRisk />} />
-              <Route path="/risks/new-from-image" element={<CreateRiskFromImagePage />} />
-              <Route path="/risks/:id" element={<RiskDetail />} />
-              <Route path="/risks/:riskId/edit" element={<RiskEditPage />} />
-              <Route path="/reports" element={<ReportsPage />} />
-              <Route path="/controls" element={<ControlsLibraryPage />} />
-              <Route path="/users" element={<UsersPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+            <Route element={<RequireAuth />}>
+              <Route element={<MainLayout />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/risks" element={<RisksList />} />
+                <Route path="/risks/new" element={<NewRisk />} />
+                <Route path="/risks/new-from-image" element={<CreateRiskFromImagePage />} />
+                <Route path="/risks/:id" element={<RiskDetail />} />
+                <Route path="/risks/:riskId/edit" element={<RiskEditPage />} />
+                <Route path="/reports" element={<ReportsPage />} />
+                <Route path="/controls" element={<ControlsLibraryPage />} />
+                <Route path="/users" element={<UsersPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/risk-definitions" element={<RiskDefinitions />} />
+              </Route>
             </Route>
 
             <Route path="*" element={<NotFound />} />

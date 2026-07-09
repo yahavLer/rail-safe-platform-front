@@ -8,8 +8,13 @@ export const session = {
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   },
   getUser(): UserBoundary | null {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? (JSON.parse(raw) as UserBoundary) : null;
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      return raw ? (JSON.parse(raw) as UserBoundary) : null;
+    } catch {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
   },
   clearUser() {
     localStorage.removeItem(SESSION_KEY);

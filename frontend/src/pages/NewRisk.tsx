@@ -41,6 +41,20 @@ import { useRiskMatrix } from "@/hooks/useRiskMatrix";
 import { taskService } from "@/api/services/taskService";
 import type { CreateTaskBoundary } from "@/api/types";
 
+
+type ApiErrorLike = {
+  response?: { data?: { message?: string; errors?: string[] | Record<string, string> } };
+  message?: string;
+};
+
+function getApiErrorMessage(error: unknown, fallback = "שגיאה לא ידועה") {
+  const e = error as ApiErrorLike;
+  const errors = e.response?.data?.errors;
+  if (Array.isArray(errors) && errors.length > 0) return errors.join("; ");
+  if (errors && typeof errors === "object") return Object.values(errors).join("; ");
+  return e.response?.data?.message || e.message || fallback;
+}
+
 const STEPS = [
   { id: 1, title: "תיאור הסיכון", icon: FileText },
   { id: 2, title: "קטגוריה ומיקום", icon: Tag },
@@ -375,9 +389,8 @@ export default function NewRisk() {
       });
 
       navigate("/risks");
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || "שגיאה לא ידועה";
-      toast.error("יצירת הסיכון נכשלה", { description: msg });
+    } catch (err: unknown) {
+      toast.error("יצירת הסיכון נכשלה", { description: getApiErrorMessage(err) });
     } finally {
       setSubmitting(false);
     }

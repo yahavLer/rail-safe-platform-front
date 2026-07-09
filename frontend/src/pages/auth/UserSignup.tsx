@@ -11,8 +11,19 @@ import {
 
 import { UserPlus, Building2, ArrowRight, CheckCircle2 } from "lucide-react";
 import { userService } from "@/api/services/userService";
+import type { CreateUserBoundary } from "@/api/types";
+import { setCurrentOrgId } from "@/api/config";
+import { session } from "@/auth/session";
 
 const ORG_ID_KEY = "railsafe.orgId";
+
+type ApiErrorLike = { response?: { data?: { message?: string } }; message?: string };
+
+function getErrorDescription(error: unknown, fallback = "שגיאה לא ידועה") {
+  const e = error as ApiErrorLike;
+  return e.response?.data?.message || e.message || fallback;
+}
+
 type Role =
   | "CHIEF_RISK_MANAGER"
   | "DIVISION_RISK_MANAGER"
@@ -39,13 +50,13 @@ export default function UserSignup() {
     const saved = localStorage.getItem(ORG_ID_KEY);
     if (saved) setOrgId(saved);
   }, []);
-  // -------- Role-based required fields --------
+  // Optional organizational scope fields. They can be assigned now or later.
   const needsDivision =
     form.role === "DIVISION_RISK_MANAGER" || form.role === "DEPARTMENT_RISK_MANAGER";
   const needsDepartment = form.role === "DEPARTMENT_RISK_MANAGER";
 
-  const divisionOk = !needsDivision || form.divisionId.trim().length > 0;
-  const departmentOk = !needsDepartment || form.departmentId.trim().length > 0;
+  const divisionOk = true;
+  const departmentOk = true;
 
   const canSubmit =
     orgId.trim().length > 0 &&
@@ -66,7 +77,7 @@ export default function UserSignup() {
       setSubmitting(true);
 
       // we send division/department only if relevant (cleaner payload)
-      const payload: any = {
+      const payload: CreateUserBoundary = {
         orgId,
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
@@ -75,19 +86,22 @@ export default function UserSignup() {
         role: form.role,
       };
 
-      if (needsDivision) payload.divisionId = form.divisionId.trim();
-      if (needsDepartment) payload.departmentId = form.departmentId.trim();
+      if (needsDivision && form.divisionId.trim()) payload.divisionId = form.divisionId.trim();
+      if (needsDepartment && form.departmentId.trim()) payload.departmentId = form.departmentId.trim();
 
-      await userService.create(payload);
+      const created = await userService.create(payload);
+      session.setUser(created);
+      session.setOrgId(orgId);
+      setCurrentOrgId(orgId);
 
       toast.success("המשתמש נוצר בהצלחה!", {
-        description: "כעת אפשר להתחבר למערכת",
+        description: "הועברת ללוח הבקרה",
       });
 
-      navigate("/login");
-    } catch (e: any) {
+      navigate("/dashboard");
+    } catch (e: unknown) {
       toast.error("יצירת משתמש נכשלה", {
-        description: e?.response?.data?.message || e?.message || "שגיאה לא ידועה",
+        description: getErrorDescription(e),
       });
     } finally {
       setSubmitting(false);
@@ -182,15 +196,15 @@ export default function UserSignup() {
 
         <div className="space-y-2">
           <Label>תפקיד</Label>
-          <Select value={form.role} onValueChange={(v: any) => setForm({ ...form, role: v })}>
+          <Select value={form.role} onValueChange={(v) => onRoleChange(v as Role)}>
             <SelectTrigger>
               <SelectValue placeholder="בחר תפקיד" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="CHIEF_RISK_MANAGER">Chief Risk Manager</SelectItem>
-              <SelectItem value="DIVISION_RISK_MANAGER">Division Risk Manager</SelectItem>
-              <SelectItem value="DEPARTMENT_RISK_MANAGER">Department Risk Manager</SelectItem>
-              <SelectItem value="EMPLOYEE">Employee</SelectItem>
+              <SelectItem value="CHIEF_RISK_MANAGER">מנהל סיכונים ראשי</SelectItem>
+              <SelectItem value="DIVISION_RISK_MANAGER">מנהל סיכונים חטיבתי</SelectItem>
+              <SelectItem value="DEPARTMENT_RISK_MANAGER">מנהל סיכונים אגפי</SelectItem>
+              <SelectItem value="EMPLOYEE">עובד</SelectItem>
             </SelectContent>
           </Select>
            <p className="text-xs text-muted-foreground">
@@ -208,7 +222,7 @@ export default function UserSignup() {
               placeholder="UUID של Division"
             />
             {!divisionOk && (
-              <p className="text-xs text-destructive">חובה להזין divisionId לתפקיד זה</p>
+              <p className="text-xs text-destructive">אפשר להזין divisionId עכשיו או להשלים בהמשך</p>
             )}
           </div>
         )}
@@ -222,7 +236,7 @@ export default function UserSignup() {
               placeholder="UUID של Department"
             />
             {!departmentOk && (
-              <p className="text-xs text-destructive">חובה להזין departmentId לתפקיד זה</p>
+              <p className="text-xs text-destructive">אפשר להזין departmentId עכשיו או להשלים בהמשך</p>
             )}
           </div>
         )}

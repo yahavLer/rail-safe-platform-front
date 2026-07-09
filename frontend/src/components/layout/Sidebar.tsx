@@ -4,12 +4,11 @@ import {
   LayoutDashboard,
   AlertTriangle,
   Plus,
-  Settings,
   Shield,
   Users,
   FileText,
   Train,
-  UserPlus,
+  UserRound,
   Sliders,
   Camera,
 } from 'lucide-react';
@@ -20,15 +19,14 @@ import type { UserBoundary } from '@/api/types';
 const SESSION_KEY = 'railsafe.session';
 
 const baseNavItems = [
-  { to: '/', icon: LayoutDashboard, label: 'לוח בקרה' },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'לוח בקרה' },
   { to: '/risks', icon: AlertTriangle, label: 'ניהול סיכונים' },
   { to: '/risks/new', icon: Plus, label: 'סיכון חדש' },
   { to: '/risks/new-from-image', icon: Camera, label: 'סיכון מתמונה' },
-  { to: '/signup/org', icon: UserPlus, label: 'הרשמה / יצירת ארגון' },
   { to: '/controls', icon: Shield, label: 'ספריית בקרות' },
   { to: '/reports', icon: FileText, label: 'דוחות' },
   { to: '/users', icon: Users, label: 'משתמשים' },
-  { to: '/settings', icon: Settings, label: 'הגדרות' },
+  { to: '/profile', icon: UserRound, label: 'פרופיל' },
 ];
 
 const chiefRiskManagerItem = {
@@ -87,7 +85,7 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === '/'}
+            end={item.to === '/dashboard'}
             onClick={onNavigate}
             className={({ isActive }) =>
               cn(
@@ -117,8 +115,8 @@ export function Sidebar({ mobile = false, onNavigate }: SidebarProps) {
             </p>
             <p className="text-xs text-sidebar-foreground/60">
               {currentUser?.role === 'CHIEF_RISK_MANAGER' && 'מנהל סיכונים ראשי'}
-              {currentUser?.role === 'DIVISION_RISK_MANAGER' && 'מנהל סיכונים מחלקתי'}
-              {currentUser?.role === 'DEPARTMENT_RISK_MANAGER' && 'מנהל סיכונים מחלקתי'}
+              {currentUser?.role === 'DIVISION_RISK_MANAGER' && 'מנהל סיכונים חטיבתי'}
+              {currentUser?.role === 'DEPARTMENT_RISK_MANAGER' && 'מנהל סיכונים אגפי'}
               {currentUser?.role === 'EMPLOYEE' && 'עובד'}
               {!currentUser?.role && 'משתמש'}
             </p>

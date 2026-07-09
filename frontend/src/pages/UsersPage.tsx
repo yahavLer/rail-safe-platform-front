@@ -29,10 +29,9 @@ import {
 } from "@/components/ui/table";
 
 const ROLE_LABEL: Record<UserRole, string> = {
-  ADMIN: "מנהל",
   CHIEF_RISK_MANAGER: "מנהל סיכונים ראשי",
   DIVISION_RISK_MANAGER: "מנהל סיכונים חטיבתי",
-  DEPARTMENT_RISK_MANAGER: "מנהל סיכונים מחלקתי",
+  DEPARTMENT_RISK_MANAGER: "מנהל סיכונים אגפי",
   EMPLOYEE: "עובד",
 };
 
@@ -138,7 +137,7 @@ export default function UsersPage() {
         lastName: form.lastName.trim(),
         email: form.email.trim(),
         role: form.role,
-        password: form.password.trim() || undefined,
+        password: form.password.trim(),
       } as unknown as CreateUserBoundary;
 
       const created = await userService.create(payload);
@@ -230,10 +229,9 @@ export default function UsersPage() {
                       onChange={(e) => updateRole(u.id, e.target.value as UserRole)}
                       disabled={!orgId}
                     >
-                      <option value="ADMIN">אדמין</option>
-                      <option value="CHIEF_RISK_MANAGER">מנהל סיכונים ראשי</option>
+                                            <option value="CHIEF_RISK_MANAGER">מנהל סיכונים ראשי</option>
                       <option value="DIVISION_RISK_MANAGER">מנהל סיכונים חטיבתי</option>
-                      <option value="DEPARTMENT_RISK_MANAGER">מנהל סיכונים מחלקתי</option>
+                      <option value="DEPARTMENT_RISK_MANAGER">מנהל סיכונים אגפי</option>
                       <option value="EMPLOYEE">עובד</option>
                     </select>
 
@@ -313,14 +311,14 @@ export default function UsersPage() {
               >
                 <option value="CHIEF_RISK_MANAGER">מנהל סיכונים ראשי</option>
                 <option value="DIVISION_RISK_MANAGER">מנהל סיכונים חטיבתי</option>
-                <option value="DEPARTMENT_RISK_MANAGER">מנהל סיכונים מחלקתי</option>
+                <option value="DEPARTMENT_RISK_MANAGER">מנהל סיכונים אגפי</option>
                 <option value="EMPLOYEE">עובד</option>
               </select>
             </div>
 
             <div className="grid gap-1">
               <div className="flex items-center justify-between">
-                <label className="text-sm text-muted-foreground">סיסמה (אופציונלי)</label>
+                <label className="text-sm text-muted-foreground">סיסמה</label>
 
                 <Button
                   type="button"
@@ -356,7 +354,8 @@ export default function UsersPage() {
                 !orgId ||
                 !form.firstName.trim() ||
                 !form.lastName.trim() ||
-                !form.email.trim()
+                !form.email.trim() ||
+                form.password.trim().length < 6
               }
             >
               יצירה
