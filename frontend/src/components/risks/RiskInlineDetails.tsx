@@ -33,6 +33,7 @@ import type {
   TaskBoundary,
   TaskStatus,
   UserBoundary,
+  RecurrenceUnit,
 } from "@/api/types";
 
 const NONE = "__none__";
@@ -74,6 +75,21 @@ const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   CANCELED: "בוטל",
 };
 
+const RECURRENCE_UNIT_LABELS: Record<RecurrenceUnit, { singular: string; plural: string }> = {
+  DAY: { singular: "יום", plural: "ימים" },
+  WEEK: { singular: "שבוע", plural: "שבועות" },
+  MONTH: { singular: "חודש", plural: "חודשים" },
+  YEAR: { singular: "שנה", plural: "שנים" },
+};
+
+function recurrenceText(item: { recurring?: boolean; recurrenceInterval?: number; recurrenceUnit?: RecurrenceUnit }) {
+  if (!item.recurring) return "לא מחזורית";
+  const interval = item.recurrenceInterval ?? 1;
+  const labels = item.recurrenceUnit ? RECURRENCE_UNIT_LABELS[item.recurrenceUnit] : undefined;
+  const unit = labels ? (interval === 1 ? labels.singular : labels.plural) : "תקופה";
+  return interval === 1 ? `מחזורית: אחת ל־${unit}` : `מחזורית: אחת ל־${interval} ${unit}`;
+}
+
 function downloadCsv(filename: string, rows: Record<string, any>[]) {
   if (!rows.length) return;
 
@@ -83,7 +99,7 @@ function downloadCsv(filename: string, rows: Record<string, any>[]) {
     ...rows.map((r) => headers.map((h) => JSON.stringify(r[h] ?? "")).join(",")),
   ].join("\n");
 
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -123,6 +139,7 @@ export function RiskInlineDetails({
     const [loading, setLoading] = useState(false);
     const [usersLoading, setUsersLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [tasksError, setTasksError] = useState<string | null>(null);
 
     const [assigneeOpen, setAssigneeOpen] = useState(false);
     const [editAssigneeOpen, setEditAssigneeOpen] = useState(false);
@@ -133,6 +150,9 @@ export function RiskInlineDetails({
     description: "",
     assigneeUserId: "",
     dueDate: "",
+    recurring: false,
+    recurrenceInterval: 1,
+    recurrenceUnit: "MONTH" as RecurrenceUnit,
     });
 
     // ---------- Edit Task dialog ----------
@@ -143,6 +163,9 @@ export function RiskInlineDetails({
     description: "",
     assigneeUserId: "",
     dueDate: "",
+    recurring: false,
+    recurrenceInterval: 1,
+    recurrenceUnit: "MONTH" as RecurrenceUnit,
     });
 
     // ---------- Edit Risk dialog ----------
@@ -169,8 +192,8 @@ export function RiskInlineDetails({
     }, [users]);
 
     const riskManagerName = useMemo(() => {
-    if (!risk?.riskManagerUserId) return "—";
-    return userLabelById[risk.riskManagerUserId] ?? risk.riskManagerUserId;
+    if (!risk?.riskManagerUserId) return "לא הוגדר";
+    return userLabelById[risk.riskManagerUserId] ?? "לא הוגדר";
     }, [risk?.riskManagerUserId, userLabelById]);
 
     const doneCount = useMemo(() => tasks.filter((t) => t.status === "DONE").length, [tasks]);
@@ -202,14 +225,23 @@ export function RiskInlineDetails({
     (async () => {
         setLoading(true);
         setError(null);
+        setTasksError(null);
         try {
-        const [r, t] = await Promise.all([
-            riskService.getById(riskId),
-            taskService.list({ orgId, riskId }),
-        ]);
+        const r = await riskService.getById(riskId);
         if (!alive) return;
         setRisk(r);
-        setTasks(t);
+
+        try {
+            const t = await taskService.list({ orgId, riskId });
+            if (!alive) return;
+            setTasks(t);
+        } catch (taskLoadError) {
+            const err = taskLoadError as AxiosError<any>;
+            console.error("load tasks failed", taskLoadError);
+            if (!alive) return;
+            setTasks([]);
+            setTasksError(`שגיאה בטעינת מיטיגציות: ${err.response?.status ?? ""}`);
+        }
         } catch (e) {
         const err = e as AxiosError<any>;
         console.error("load details failed", e);
@@ -227,6 +259,11 @@ export function RiskInlineDetails({
 
     // ---------- Actions ----------
     async function createTask() {
+    if (taskForm.recurring && (!taskForm.recurrenceInterval || taskForm.recurrenceInterval <= 0 || !taskForm.recurrenceUnit)) {
+        setTasksError("יש להזין מחזוריות תקינה למיטיגציה מחזורית");
+        return;
+    }
+
     try {
         const created = await taskService.create({
         orgId,
@@ -235,11 +272,14 @@ export function RiskInlineDetails({
         description: taskForm.description.trim(),
         assigneeUserId: taskForm.assigneeUserId || undefined,
         dueDate: toInstantIso(taskForm.dueDate),
+        recurring: taskForm.recurring,
+        recurrenceInterval: taskForm.recurring ? taskForm.recurrenceInterval : undefined,
+        recurrenceUnit: taskForm.recurring ? taskForm.recurrenceUnit : undefined,
         });
 
         setTasks((prev) => [created, ...prev]);
         setCreateTaskOpen(false);
-        setTaskForm({ title: "", description: "", assigneeUserId: "", dueDate: "" });
+        setTaskForm({ title: "", description: "", assigneeUserId: "", dueDate: "", recurring: false, recurrenceInterval: 1, recurrenceUnit: "MONTH" });
     } catch (e) {
         console.error("createTask failed", e);
     }
@@ -256,6 +296,10 @@ export function RiskInlineDetails({
 
     async function saveTaskEdit() {
     if (!editingTaskId) return;
+    if (editForm.recurring && (!editForm.recurrenceInterval || editForm.recurrenceInterval <= 0 || !editForm.recurrenceUnit)) {
+        setTasksError("יש להזין מחזוריות תקינה למיטיגציה מחזורית");
+        return;
+    }
 
     try {
         const updated = await taskService.update(editingTaskId, {
@@ -263,6 +307,9 @@ export function RiskInlineDetails({
         description: editForm.description.trim(),
         assigneeUserId: editForm.assigneeUserId || undefined,
         dueDate: toInstantIso(editForm.dueDate),
+        recurring: editForm.recurring,
+        recurrenceInterval: editForm.recurring ? editForm.recurrenceInterval : undefined,
+        recurrenceUnit: editForm.recurring ? editForm.recurrenceUnit : undefined,
         });
 
         setTasks((prev) => prev.map((t) => (t.id === editingTaskId ? updated : t)));
@@ -277,7 +324,6 @@ export function RiskInlineDetails({
     if (!risk) return;
     downloadCsv(`risk-${risk.id}.csv`, [
         {
-        id: risk.id,
         title: risk.title,
         category: categoryName ?? risk.categoryCode,
         categoryCode: risk.categoryCode,
@@ -286,7 +332,6 @@ export function RiskInlineDetails({
         status: risk.status,
         location: risk.location ?? "",
         riskManager: riskManagerName,
-        riskManagerUserId: risk.riskManagerUserId ?? "",
         frequencyLevel: risk.frequencyLevel,
         severityLevel: risk.severityLevel,
         description: risk.description ?? "",
@@ -301,11 +346,10 @@ export function RiskInlineDetails({
     downloadCsv(
         `tasks-risk-${riskId}.csv`,
         tasks.map((t) => ({
-        id: t.id,
         title: t.title,
         status: t.status,
-        assignee: t.assigneeUserId ? (userLabelById[t.assigneeUserId] ?? t.assigneeUserId) : "לא שויך",
-        assigneeUserId: t.assigneeUserId ?? "",
+        assignee: t.assigneeUserId ? (userLabelById[t.assigneeUserId] ?? "לא שויך") : "לא שויך",
+        recurrence: recurrenceText(t),
         dueDate: t.dueDate ?? "",
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
@@ -472,6 +516,12 @@ export function RiskInlineDetails({
               </div>
             </div>
 
+            {tasksError && (
+              <div className="mb-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {tasksError}
+              </div>
+            )}
+
             <div className="rounded-xl border divide-y">
               {tasks.length === 0 ? (
                 <div className="p-3 text-sm text-muted-foreground">אין עדיין מיטיגציות לסיכון הזה.</div>
@@ -483,13 +533,16 @@ export function RiskInlineDetails({
                       <div className="text-xs text-muted-foreground">
                         אחראי טיפול:{" "}
                         {t.assigneeUserId
-                          ? userLabelById[t.assigneeUserId] ?? t.assigneeUserId
+                          ? userLabelById[t.assigneeUserId] ?? "לא שויך"
                           : "לא שויך"}
                         {t.dueDate ? ` • יעד: ${isoToDateInput(t.dueDate)}` : ""}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         סטטוס: {TASK_STATUS_LABELS[t.status]}
                       </div>
+                      {t.recurring && (
+                        <div className="text-xs text-muted-foreground">{recurrenceText(t)}</div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -503,6 +556,9 @@ export function RiskInlineDetails({
                             description: t.description,
                             assigneeUserId: t.assigneeUserId ?? "",
                             dueDate: isoToDateInput(t.dueDate),
+                            recurring: !!t.recurring,
+                            recurrenceInterval: t.recurrenceInterval ?? 1,
+                            recurrenceUnit: t.recurrenceUnit ?? "MONTH",
                           });
                           setEditTaskOpen(true);
                         }}
@@ -750,6 +806,43 @@ export function RiskInlineDetails({
                     onChange={(e) => setTaskForm((s) => ({ ...s, dueDate: e.target.value }))}
                   />
                 </div>
+
+                <div className="rounded-lg border p-3 space-y-3">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={taskForm.recurring}
+                      onChange={(e) => setTaskForm((s) => ({ ...s, recurring: e.target.checked }))}
+                    />
+                    מיטיגציה מחזורית
+                  </label>
+                  {taskForm.recurring && (
+                    <div className="grid grid-cols-[1fr_1.4fr] gap-3">
+                      <div className="space-y-1">
+                        <Label>מתבצע אחת ל־</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={taskForm.recurrenceInterval}
+                          onChange={(e) => setTaskForm((s) => ({ ...s, recurrenceInterval: Math.max(1, Number(e.target.value) || 1) }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>יחידה</Label>
+                        <Select value={taskForm.recurrenceUnit} onValueChange={(value) => setTaskForm((s) => ({ ...s, recurrenceUnit: value as RecurrenceUnit }))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="DAY">יום / ימים</SelectItem>
+                            <SelectItem value="WEEK">שבוע / שבועות</SelectItem>
+                            <SelectItem value="MONTH">חודש / חודשים</SelectItem>
+                            <SelectItem value="YEAR">שנה / שנים</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2 text-xs text-muted-foreground">{recurrenceText(taskForm)}</div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <DialogFooter className="gap-2">
@@ -853,6 +946,43 @@ export function RiskInlineDetails({
                     value={editForm.dueDate}
                     onChange={(e) => setEditForm((s) => ({ ...s, dueDate: e.target.value }))}
                   />
+                </div>
+
+                <div className="rounded-lg border p-3 space-y-3">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={editForm.recurring}
+                      onChange={(e) => setEditForm((s) => ({ ...s, recurring: e.target.checked }))}
+                    />
+                    מיטיגציה מחזורית
+                  </label>
+                  {editForm.recurring && (
+                    <div className="grid grid-cols-[1fr_1.4fr] gap-3">
+                      <div className="space-y-1">
+                        <Label>מתבצע אחת ל־</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={editForm.recurrenceInterval}
+                          onChange={(e) => setEditForm((s) => ({ ...s, recurrenceInterval: Math.max(1, Number(e.target.value) || 1) }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>יחידה</Label>
+                        <Select value={editForm.recurrenceUnit} onValueChange={(value) => setEditForm((s) => ({ ...s, recurrenceUnit: value as RecurrenceUnit }))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="DAY">יום / ימים</SelectItem>
+                            <SelectItem value="WEEK">שבוע / שבועות</SelectItem>
+                            <SelectItem value="MONTH">חודש / חודשים</SelectItem>
+                            <SelectItem value="YEAR">שנה / שנים</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2 text-xs text-muted-foreground">{recurrenceText(editForm)}</div>
+                    </div>
+                  )}
                 </div>
               </div>
 

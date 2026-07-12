@@ -60,8 +60,8 @@ const STEPS = [
   { id: 2, title: "קטגוריה ומיקום", icon: Tag },
   { id: 3, title: "סבירות", icon: BarChart3 },
   { id: 4, title: "השפעה", icon: Zap },
-  { id: 5, title: "אחראי וסיכון שיורי", icon: User },
-  { id: 6, title: "בקרות וסיכום", icon: Shield },
+  { id: 5, title: "אחראי ומיטיגציות", icon: User },
+  { id: 6, title: "סיכון שיורי וסיכום", icon: Shield },
 ];
 
 type Tone = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -102,6 +102,19 @@ const TONE_STYLES: Record<
     text: "text-risk-critical",
   },
 };
+
+const RECURRENCE_UNIT_LABELS: Record<string, string> = {
+  DAY: "ימים",
+  WEEK: "שבועות",
+  MONTH: "חודשים",
+  YEAR: "שנים",
+};
+
+function recurrenceText(task: { recurring?: boolean; recurrenceInterval?: number; recurrenceUnit?: string }) {
+  if (!task.recurring) return "חד פעמי";
+  const unit = task.recurrenceUnit ? RECURRENCE_UNIT_LABELS[task.recurrenceUnit] : "תקופה";
+  return `מתבצע אחת ל־${task.recurrenceInterval ?? "?"} ${unit}`;
+}
 
 function LevelCard(props: {
   value: number;
@@ -178,10 +191,9 @@ export default function NewRisk() {
       );
 
       setUsers(sorted);
-    } catch (e: any) {
+    } catch (e: unknown) {
       toast.error("שגיאה בטעינת משתמשים", {
-        description:
-          e?.response?.data?.message || e?.message || "לא ניתן למשוך משתמשים מהשרת",
+        description: getApiErrorMessage(e, "לא ניתן למשוך משתמשים מהשרת"),
       });
     } finally {
       setUsersLoading(false);
@@ -194,6 +206,13 @@ export default function NewRisk() {
     if (usersLoading) return;
     if (users.length > 0) return;
     fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
+
+  useEffect(() => {
+    if (currentStep !== 5) return;
+    if (mitigationTemplates.length > 0) return;
+    fetchMitigationTemplates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);
 
@@ -211,19 +230,22 @@ export default function NewRisk() {
     // ✅ Residual ("אחרי")
     frequencyAfter: 0,
     severityAfter: 0,
-
-    notes: "",
   });
 
   const [draftTasks, setDraftTasks] = useState<
     Array<Omit<CreateTaskBoundary, "orgId" | "riskId">>
   >([]);
 
+  const [mitigationTemplates, setMitigationTemplates] = useState<Array<Omit<CreateTaskBoundary, "orgId" | "riskId">>>([]);
+
   const [draftTaskForm, setDraftTaskForm] = useState({
     title: "",
     description: "",
     assigneeUserId: "",
     dueDate: "", // date
+    recurring: false,
+    recurrenceInterval: 1,
+    recurrenceUnit: "MONTH" as const,
   });
 
   function addDraftTask() {
@@ -238,14 +260,59 @@ export default function NewRisk() {
         dueDate: draftTaskForm.dueDate
           ? new Date(`${draftTaskForm.dueDate}T00:00:00`).toISOString()
           : undefined,
+        recurring: draftTaskForm.recurring,
+        recurrenceInterval: draftTaskForm.recurring ? draftTaskForm.recurrenceInterval : undefined,
+        recurrenceUnit: draftTaskForm.recurring ? draftTaskForm.recurrenceUnit : undefined,
       },
     ]);
 
-    setDraftTaskForm({ title: "", description: "", assigneeUserId: "", dueDate: "" });
+    setDraftTaskForm({
+      title: "",
+      description: "",
+      assigneeUserId: "",
+      dueDate: "",
+      recurring: false,
+      recurrenceInterval: 1,
+      recurrenceUnit: "MONTH",
+    });
   }
 
   function removeDraftTask(idx: number) {
     setDraftTasks((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function addTemplateMitigation(indexValue: string) {
+    const template = mitigationTemplates[Number(indexValue)];
+    if (!template) return;
+    setDraftTasks((prev) => [...prev, { ...template }]);
+  }
+
+  async function fetchMitigationTemplates() {
+    if (!orgId) return;
+    try {
+      const tasks = await taskService.list({ orgId });
+      const seen = new Set<string>();
+      const templates = tasks
+        .filter((task) => task.title?.trim() && task.description?.trim())
+        .map((task) => ({
+          title: task.title,
+          description: task.description,
+          assigneeUserId: task.assigneeUserId,
+          dueDate: undefined,
+          recurring: task.recurring,
+          recurrenceInterval: task.recurrenceInterval,
+          recurrenceUnit: task.recurrenceUnit,
+        }))
+        .filter((task) => {
+          const key = `${task.title}::${task.description}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      setMitigationTemplates(templates);
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   const [categories, setCategories] = useState<CategoryBoundary[]>([]);
@@ -280,10 +347,10 @@ export default function NewRisk() {
         .sort((a, b) => a.displayOrder - b.displayOrder);
 
       setCategories(activeSorted);
-    } catch (e: any) {
-      const msg =
-        e?.response?.data?.message || e?.message || "לא ניתן למשוך קטגוריות מהשרת";
-      toast.error("שגיאה בטעינת קטגוריות", { description: msg });
+    } catch (e: unknown) {
+      toast.error("שגיאה בטעינת קטגוריות", {
+        description: getApiErrorMessage(e, "לא ניתן למשוך קטגוריות מהשרת"),
+      });
     } finally {
       setCategoriesLoading(false);
     }
@@ -315,13 +382,9 @@ export default function NewRisk() {
       case 4:
         return formData.impact > 0;
       case 5:
-        return (
-          formData.riskManagerUserId !== "" &&
-          formData.frequencyAfter > 0 &&
-          formData.severityAfter > 0
-        );
+        return formData.riskManagerUserId !== "" && draftTasks.length > 0;
       case 6:
-        return true;
+        return formData.frequencyAfter > 0 && formData.severityAfter > 0;
       default:
         return false;
     }
@@ -358,7 +421,6 @@ export default function NewRisk() {
         frequencyAfter: formData.frequencyAfter,
         severityAfter: formData.severityAfter,
         location: formData.location || undefined,
-        notes: formData.notes || undefined,
       };
 
       const createdRisk = await riskService.create(payload);
@@ -374,6 +436,9 @@ export default function NewRisk() {
                 description: t.description,
                 assigneeUserId: t.assigneeUserId,
                 dueDate: t.dueDate,
+                recurring: t.recurring,
+                recurrenceInterval: t.recurrenceInterval,
+                recurrenceUnit: t.recurrenceUnit,
               })
             )
           );
@@ -616,14 +681,12 @@ export default function NewRisk() {
           </div>
         )}
 
-        {/* Step 5: Owner + Residual */}
+        {/* Step 5: Owner + Mitigations */}
         {currentStep === 5 && (
           <div className="space-y-6">
             <div>
               <Label className="text-lg font-semibold">אחראי/ת על הסיכון *</Label>
-              <p className="text-sm text-muted-foreground">
-                בחרי מי הבעלים של הסיכון בארגון
-              </p>
+              <p className="text-sm text-muted-foreground">בחרי מי הבעלים של הסיכון בארגון</p>
             </div>
 
             <Select
@@ -646,9 +709,7 @@ export default function NewRisk() {
                 )}
 
                 {!usersLoading && users.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">
-                    אין משתמשים לארגון הזה
-                  </div>
+                  <div className="px-3 py-2 text-sm text-muted-foreground">אין משתמשים לארגון הזה</div>
                 )}
 
                 {users.map((u) => (
@@ -659,42 +720,165 @@ export default function NewRisk() {
               </SelectContent>
             </Select>
 
-            <div className="pt-2">
-              <Label className="text-lg font-semibold">רמת סיכון אחרי מיטיגציות *</Label>
-              <p className="text-sm text-muted-foreground">
-                לאן את/ה מצפה שהסיכון “ירד” אחרי ביצוע המשימות?
-              </p>
-            </div>
-
-            <div>
-              <Label className="font-medium">סבירות אחרי *</Label>
-              <div className="mt-3 grid grid-cols-2 gap-4">
-                {[1, 2, 3, 4].map((value) => (
-                  <LevelCard
-                    key={value}
-                    value={value}
-                    selected={formData.frequencyAfter === value}
-                    onClick={() => setFormData({ ...formData, frequencyAfter: value })}
-                    title={frequencyMap[value]?.label ?? `רמה ${value}`}
-                    description={frequencyMap[value]?.description}
-                  />
-                ))}
+            <div className="rounded-xl border p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-semibold">מיטיגציות *</div>
+                  <div className="text-sm text-muted-foreground">
+                    קודם מגדירים או בוחרים מיטיגציות, ורק אחר כך מעריכים את הסיכון השיורי.
+                  </div>
+                </div>
+                <div className="text-sm text-muted-foreground">סה״כ: {draftTasks.length}</div>
               </div>
-            </div>
 
-            <div>
-              <Label className="font-medium">השפעה אחרי *</Label>
-              <div className="mt-3 grid grid-cols-2 gap-4">
-                {[1, 2, 3, 4].map((value) => (
-                  <LevelCard
-                    key={value}
-                    value={value}
-                    selected={formData.severityAfter === value}
-                    onClick={() => setFormData({ ...formData, severityAfter: value })}
-                    title={severityMap[value]?.label ?? `רמה ${value}`}
-                    description={severityMap[value]?.description}
+              {mitigationTemplates.length > 0 && (
+                <div className="space-y-1">
+                  <Label>בחירה מספריית מיטיגציות קיימת</Label>
+                  <Select onValueChange={addTemplateMitigation}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="בחר מיטיגציה קיימת כתבנית" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mitigationTemplates.map((t, index) => (
+                        <SelectItem key={`${t.title}-${index}`} value={String(index)}>
+                          {t.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="grid gap-3">
+                <div className="space-y-1">
+                  <Label>כותרת</Label>
+                  <Input
+                    value={draftTaskForm.title}
+                    onChange={(e) =>
+                      setDraftTaskForm((s) => ({ ...s, title: e.target.value }))
+                    }
+                    placeholder="לדוגמה: הצבת גידור זמני"
                   />
-                ))}
+                </div>
+
+                <div className="space-y-1">
+                  <Label>תיאור</Label>
+                  <Textarea
+                    value={draftTaskForm.description}
+                    onChange={(e) =>
+                      setDraftTaskForm((s) => ({ ...s, description: e.target.value }))
+                    }
+                    rows={3}
+                    placeholder="מה בדיוק עושים?"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>אחראי (UserId)</Label>
+                    <Input
+                      value={draftTaskForm.assigneeUserId}
+                      onChange={(e) =>
+                        setDraftTaskForm((s) => ({ ...s, assigneeUserId: e.target.value }))
+                      }
+                      placeholder="אופציונלי"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>תאריך יעד</Label>
+                    <Input
+                      type="date"
+                      value={draftTaskForm.dueDate}
+                      onChange={(e) =>
+                        setDraftTaskForm((s) => ({ ...s, dueDate: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-lg border p-3 space-y-3">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={draftTaskForm.recurring}
+                      onChange={(e) =>
+                        setDraftTaskForm((s) => ({ ...s, recurring: e.target.checked }))
+                      }
+                    />
+                    מחזוריות
+                  </label>
+
+                  {draftTaskForm.recurring && (
+                    <div className="grid grid-cols-[1fr_1.4fr] gap-3">
+                      <div className="space-y-1">
+                        <Label>כל כמה?</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={draftTaskForm.recurrenceInterval}
+                          onChange={(e) =>
+                            setDraftTaskForm((s) => ({
+                              ...s,
+                              recurrenceInterval: Math.max(1, Number(e.target.value) || 1),
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>יחידה</Label>
+                        <Select
+                          value={draftTaskForm.recurrenceUnit}
+                          onValueChange={(value) =>
+                            setDraftTaskForm((s) => ({
+                              ...s,
+                              recurrenceUnit: value as "DAY" | "WEEK" | "MONTH" | "YEAR",
+                            }))
+                          }
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="DAY">ימים</SelectItem>
+                            <SelectItem value="WEEK">שבועות</SelectItem>
+                            <SelectItem value="MONTH">חודשים</SelectItem>
+                            <SelectItem value="YEAR">שנים</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2 text-xs text-muted-foreground">
+                        מתבצע אחת ל־{draftTaskForm.recurrenceInterval} {RECURRENCE_UNIT_LABELS[draftTaskForm.recurrenceUnit]}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addDraftTask}
+                  disabled={!draftTaskForm.title.trim() || !draftTaskForm.description.trim()}
+                >
+                  הוסף מיטיגציה לרשימה
+                </Button>
+              </div>
+
+              <div className="rounded-lg border divide-y">
+                {draftTasks.length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground">אין מיטיגציות שהוגדרו עדיין.</div>
+                ) : (
+                  draftTasks.map((t, idx) => (
+                    <div key={idx} className="p-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{t.title}</div>
+                        <div className="text-xs text-muted-foreground truncate">{t.description}</div>
+                        <div className="text-xs text-muted-foreground">{recurrenceText(t)}</div>
+                      </div>
+                      <Button type="button" variant="ghost" onClick={() => removeDraftTask(idx)}>
+                        הסר
+                      </Button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -704,8 +888,47 @@ export default function NewRisk() {
         {currentStep === 6 && (
           <div className="space-y-6">
             <div>
-              <Label className="text-lg font-semibold">סיכום</Label>
-              <p className="text-sm text-muted-foreground">בדוק את הפרטים לפני יצירת הסיכון</p>
+              <Label className="text-lg font-semibold">סיכון שיורי וסיכום</Label>
+              <p className="text-sm text-muted-foreground">בחרי את רמת הסיכון הצפויה לאחר ביצוע המיטיגציות, ואז בדקי את הפרטים לפני יצירה.</p>
+            </div>
+
+            <div className="rounded-xl border p-4 space-y-4">
+              <div>
+                <Label className="text-lg font-semibold">רמת סיכון אחרי מיטיגציות *</Label>
+                <p className="text-sm text-muted-foreground">לאן את/ה מצפה שהסיכון ירד אחרי ביצוע המיטיגציות?</p>
+              </div>
+
+              <div>
+                <Label className="font-medium">סבירות אחרי *</Label>
+                <div className="mt-3 grid grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map((value) => (
+                    <LevelCard
+                      key={value}
+                      value={value}
+                      selected={formData.frequencyAfter === value}
+                      onClick={() => setFormData({ ...formData, frequencyAfter: value })}
+                      title={frequencyMap[value]?.label ?? `רמה ${value}`}
+                      description={frequencyMap[value]?.description}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label className="font-medium">השפעה אחרי *</Label>
+                <div className="mt-3 grid grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map((value) => (
+                    <LevelCard
+                      key={value}
+                      value={value}
+                      selected={formData.severityAfter === value}
+                      onClick={() => setFormData({ ...formData, severityAfter: value })}
+                      title={severityMap[value]?.label ?? `רמה ${value}`}
+                      description={severityMap[value]?.description}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
 
             {severity && (
@@ -802,106 +1025,20 @@ export default function NewRisk() {
                   ({formData.severityAfter})
                 </span>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">הערות נוספות</Label>
-              <Textarea
-                id="notes"
-                placeholder="הערות או פרטים נוספים..."
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows={3}
-              />
-            </div>
-
-            <div className="rounded-xl border p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-semibold">מיטיגציות (משימות)</div>
-                  <div className="text-sm text-muted-foreground">
-                    לא חובה — אפשר גם אחרי יצירת הסיכון
-                  </div>
-                </div>
-                <div className="text-sm text-muted-foreground">סה״כ: {draftTasks.length}</div>
-              </div>
-
-              <div className="grid gap-3">
+              <div className="space-y-2 border-t pt-3">
+                <span className="text-muted-foreground">מיטיגציות:</span>
                 <div className="space-y-1">
-                  <Label>כותרת</Label>
-                  <Input
-                    value={draftTaskForm.title}
-                    onChange={(e) =>
-                      setDraftTaskForm((s) => ({ ...s, title: e.target.value }))
-                    }
-                    placeholder="לדוגמה: הצבת גידור זמני"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <Label>תיאור</Label>
-                  <Textarea
-                    value={draftTaskForm.description}
-                    onChange={(e) =>
-                      setDraftTaskForm((s) => ({ ...s, description: e.target.value }))
-                    }
-                    rows={3}
-                    placeholder="מה בדיוק עושים?"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label>אחראי (UserId)</Label>
-                    <Input
-                      value={draftTaskForm.assigneeUserId}
-                      onChange={(e) =>
-                        setDraftTaskForm((s) => ({ ...s, assigneeUserId: e.target.value }))
-                      }
-                      placeholder="אופציונלי"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label>תאריך יעד</Label>
-                    <Input
-                      type="date"
-                      value={draftTaskForm.dueDate}
-                      onChange={(e) =>
-                        setDraftTaskForm((s) => ({ ...s, dueDate: e.target.value }))
-                      }
-                    />
-                  </div>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addDraftTask}
-                  disabled={!draftTaskForm.title.trim() || !draftTaskForm.description.trim()}
-                >
-                  הוסף משימה לרשימה
-                </Button>
-              </div>
-
-              <div className="rounded-lg border divide-y">
-                {draftTasks.length === 0 ? (
-                  <div className="p-3 text-sm text-muted-foreground">אין משימות שהוגדרו עדיין.</div>
-                ) : (
-                  draftTasks.map((t, idx) => (
-                    <div key={idx} className="p-3 flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{t.title}</div>
-                        <div className="text-xs text-muted-foreground truncate">{t.description}</div>
-                      </div>
-                      <Button type="button" variant="ghost" onClick={() => removeDraftTask(idx)}>
-                        הסר
-                      </Button>
+                  {draftTasks.map((task, index) => (
+                    <div key={index} className="text-sm">
+                      <span className="font-medium">{task.title}</span>
+                      <span className="text-muted-foreground"> — {recurrenceText(task)}</span>
                     </div>
-                  ))
-                )}
+                  ))}
+                </div>
               </div>
             </div>
+
           </div>
         )}
       </div>

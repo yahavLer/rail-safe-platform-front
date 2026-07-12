@@ -15,6 +15,17 @@ interface Props {
   orgId: string;
 }
 
+const FREQUENCY_DETAILS: Record<number, { label: string; formula: string; description: string }> = {
+  4: { label: "מדי פעם", formula: "X > 10^-3", description: "בערך אחת לחודש או יותר." },
+  3: { label: "נמוכה", formula: "10^-4 < X <= 10^-3", description: "בין אחת לחודש לאחת לשנה." },
+  2: { label: "לא סביר", formula: "10^-5 < X <= 10^-4", description: "בין אחת לשנה לאחת ל-10 שנים." },
+  1: { label: "נדיר", formula: "X <= 10^-5", description: "מעל 10 שנים." },
+};
+
+function displayDescription(levelDef: LevelDefinitionBoundary) {
+  return levelDef.description?.trim() || FREQUENCY_DETAILS[levelDef.level]?.description || "";
+}
+
 export default function FrequencyLevelsTab({ orgId }: Props) {
   const [levels, setLevels] = useState<LevelDefinitionBoundary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +39,7 @@ export default function FrequencyLevelsTab({ orgId }: Props) {
     try {
       setLoading(true);
       const matrix = await organizationService.getRiskMatrix(orgId);
-      setLevels(matrix.frequencyLevels || []);
+      setLevels((matrix.frequencyLevels || []).map((level) => ({ ...level, description: displayDescription(level) })));
     } catch (e: any) {
       toast.error("שגיאה בטעינת רמות תדירות", {
         description: e?.response?.data?.message || e?.message,
@@ -99,17 +110,17 @@ interface LevelCardProps {
 }
 
 function LevelCard({ levelDef, onSave, isSaving }: LevelCardProps) {
-  const [description, setDescription] = useState(levelDef.description || "");
+  const [description, setDescription] = useState(displayDescription(levelDef));
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
-    setDescription(levelDef.description || "");
+    setDescription(displayDescription(levelDef));
     setHasChanges(false);
   }, [levelDef.description]);
 
   const handleChange = (value: string) => {
     setDescription(value);
-    setHasChanges(value !== (levelDef.description || ""));
+    setHasChanges(value !== displayDescription(levelDef));
   };
 
   const handleSave = async () => {
@@ -146,8 +157,8 @@ function LevelCard({ levelDef, onSave, isSaving }: LevelCardProps) {
               {levelDef.level}
             </div>
             <div>
-              <CardTitle>{levelDef.label}</CardTitle>
-              <CardDescription>רמת תדירות {levelDef.level}</CardDescription>
+              <CardTitle>{FREQUENCY_DETAILS[levelDef.level]?.label ?? levelDef.label}</CardTitle>
+              <CardDescription>דירוג {levelDef.level}</CardDescription>
             </div>
           </div>
           <Button
@@ -167,13 +178,19 @@ function LevelCard({ levelDef, onSave, isSaving }: LevelCardProps) {
         </div>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 grid gap-2 rounded-md border bg-white/70 p-3 text-sm md:grid-cols-[120px_1fr]">
+          <div className="text-muted-foreground">טווח</div>
+          <div dir="ltr" className="text-left font-mono md:text-right">{FREQUENCY_DETAILS[levelDef.level]?.formula}</div>
+          <div className="text-muted-foreground">דוגמה</div>
+          <div>{FREQUENCY_DETAILS[levelDef.level]?.description}</div>
+        </div>
         <div className="space-y-2">
           <Label htmlFor={`freq-desc-${levelDef.level}`}>תיאור מפורט</Label>
           <Textarea
             id={`freq-desc-${levelDef.level}`}
             value={description}
             onChange={(e) => handleChange(e.target.value)}
-            placeholder={`הגדר את התיאור עבור רמת תדירות ${levelDef.level} - ${levelDef.label}`}
+            placeholder={FREQUENCY_DETAILS[levelDef.level]?.description ?? `הגדר את התיאור עבור רמת תדירות ${levelDef.level}`}
             rows={4}
             className="resize-none bg-white"
           />

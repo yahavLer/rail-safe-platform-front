@@ -15,6 +15,7 @@ export type RiskClassification =
   | "NEGLIGIBLE_GREEN";
 
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "CANCELED";
+export type RecurrenceUnit = "DAY" | "WEEK" | "MONTH" | "YEAR";
 
 export type UserRole =
   | "CHIEF_RISK_MANAGER"
@@ -148,6 +149,9 @@ export interface CreateTaskBoundary {
   description: string;      
   assigneeUserId?: string;
   dueDate?: string;
+  recurring?: boolean;
+  recurrenceInterval?: number;
+  recurrenceUnit?: RecurrenceUnit;
 }
 
 export interface TaskBoundary {
@@ -159,6 +163,9 @@ export interface TaskBoundary {
   status: TaskStatus;
   assigneeUserId?: string;
   dueDate?: string;
+  recurring: boolean;
+  recurrenceInterval?: number;
+  recurrenceUnit?: RecurrenceUnit;
   completedAt?: string;     // אם אין בבאק כרגע - אפשר להשאיר, לא שובר
   createdAt: string;
   updatedAt: string;
@@ -169,6 +176,9 @@ export interface UpdateTaskBoundary {
   description?: string;
   dueDate?: string;
   assigneeUserId?: string;
+  recurring?: boolean;
+  recurrenceInterval?: number;
+  recurrenceUnit?: RecurrenceUnit;
 }
 
 export interface UpdateTaskStatusBoundary {

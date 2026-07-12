@@ -294,9 +294,27 @@ export function RiskDraftDetails({
             <Textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
 
-          <div>
+          <div className="space-y-1">
             <Label>קטגוריה</Label>
-            <Input value={categoryName || categoryCode} readOnly />
+            {categoryName ? (
+              <>
+                <Input value={categoryName} readOnly />
+                {categoryCode && (
+                  <div className="text-xs text-muted-foreground">קוד קטגוריה: {categoryCode}</div>
+                )}
+              </>
+            ) : (
+              <>
+                <Input
+                  value={categoryCode}
+                  onChange={(e) => setCategoryCode(e.target.value)}
+                  placeholder="הזיני קוד קטגוריה קיים"
+                />
+                <div className="text-xs text-muted-foreground">
+                  אם הטיוטה נוצרה ידנית, יש לבחור קוד קטגוריה קיים לפני יצירת הסיכון.
+                </div>
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

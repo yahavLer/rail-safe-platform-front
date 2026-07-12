@@ -76,13 +76,15 @@ export const aiRiskAnalysisService = {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-        params: {
-          orgId: input.orgId,
-          divisionId: input.divisionId,
-          departmentId: input.departmentId,
-          riskManagerUserId: input.riskManagerUserId,
-          location: input.location,
-        },
+        params: Object.fromEntries(
+          Object.entries({
+            orgId: input.orgId,
+            divisionId: input.divisionId,
+            departmentId: input.departmentId,
+            riskManagerUserId: input.riskManagerUserId,
+            location: input.location,
+          }).filter(([, value]) => value !== undefined && value !== null && value !== "")
+        ),
       }
     );
 

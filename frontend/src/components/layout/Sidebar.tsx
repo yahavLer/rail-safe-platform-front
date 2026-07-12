@@ -23,7 +23,7 @@ const baseNavItems = [
   { to: '/risks', icon: AlertTriangle, label: 'ניהול סיכונים' },
   { to: '/risks/new', icon: Plus, label: 'סיכון חדש' },
   { to: '/risks/new-from-image', icon: Camera, label: 'סיכון מתמונה' },
-  { to: '/controls', icon: Shield, label: 'ספריית בקרות' },
+  { to: '/controls', icon: Shield, label: 'ספריית מיטיגציות' },
   { to: '/reports', icon: FileText, label: 'דוחות' },
   { to: '/users', icon: Users, label: 'משתמשים' },
   { to: '/profile', icon: UserRound, label: 'פרופיל' },

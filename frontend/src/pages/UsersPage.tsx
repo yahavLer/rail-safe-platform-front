@@ -217,7 +217,6 @@ export default function UsersPage() {
                 <TableRow key={u.id}>
                   <TableCell className="text-right">
                     <div className="font-medium">{u.firstName} {u.lastName}</div>
-                    <div className="text-xs text-muted-foreground">{u.id}</div>
                   </TableCell>
 
                   <TableCell className="text-right">{u.email}</TableCell>

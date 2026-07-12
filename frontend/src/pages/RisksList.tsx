@@ -51,6 +51,25 @@ const isRiskClassification = (v: string): v is RiskClassification =>
 const isRiskStatus = (v: string): v is RiskStatus =>
   ["OPEN", "MITIGATION_PLANNED", "IN_PROGRESS", "CLOSED", "DRAFT"].includes(v);
 
+function downloadCsv(filename: string, rows: Record<string, unknown>[]) {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0] ?? {});
+  const escape = (v: unknown) => {
+    const s = String(v ?? "");
+    const needsQuotes = /[,"\n]/.test(s);
+    const escaped = s.replace(/"/g, '""');
+    return needsQuotes ? `"${escaped}"` : escaped;
+  };
+  const csv = [headers.join(","), ...rows.map((r) => headers.map((h) => escape(r[h])).join(","))].join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function RisksList() {
   const nav = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -168,6 +187,23 @@ export default function RisksList() {
     setExpandedRiskId(riskId);
   }
 
+  function exportCsv() {
+    const rows = filteredRisks.map((r) => ({
+      title: r.title,
+      category: categoryNameByCode[r.categoryCode] ?? r.categoryCode,
+      riskScore: r.riskScore,
+      classification: toUiSeverity(r.classification),
+      status: toUiStatus(r.status),
+      location: r.location ?? "",
+      riskOwner: r.riskManagerUserId ? (userLabelById[r.riskManagerUserId] ?? "לא הוגדר") : "לא הוגדר",
+      frequencyLevel: r.frequencyLevel,
+      severityLevel: r.severityLevel,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    }));
+    downloadCsv(`risks_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.csv`, rows);
+  }
+
   if (!orgId) {
     return (
       <div className="mt-6 text-sm text-red-600">
@@ -192,7 +228,7 @@ export default function RisksList() {
 
         <div className="flex gap-2">
           <Button onClick={() => nav("/risks/new")}>+ סיכון חדש</Button>
-          <Button variant="outline" onClick={() => console.log("export CSV")}>
+          <Button variant="outline" onClick={exportCsv} disabled={!filteredRisks.length}>
             יצוא CSV
           </Button>
         </div>

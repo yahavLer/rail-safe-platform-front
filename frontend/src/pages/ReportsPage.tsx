@@ -20,8 +20,9 @@ import { Badge } from "@/components/ui/badge";
 
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { riskService } from "@/api/services/riskService";
+import { userService } from "@/api/services/userService";
 import { getCurrentOrgId } from "@/api/config";
-import type { RiskBoundary } from "@/api/types";
+import type { RiskBoundary, UserBoundary } from "@/api/types";
 
 function toDateInputValue(d: Date) {
   return format(d, "yyyy-MM-dd");
@@ -80,7 +81,7 @@ function downloadCsv(filename: string, rows: Record<string, any>[]) {
     ...rows.map((r) => headers.map((h) => escape(r[h])).join(",")),
   ].join("\n");
 
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
 
   const a = document.createElement("a");
@@ -96,6 +97,7 @@ export default function ReportsPage() {
   const orgId = getCurrentOrgId();
 
   const [risks, setRisks] = useState<RiskBoundary[]>([]);
+  const [users, setUsers] = useState<UserBoundary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,6 +110,7 @@ export default function ReportsPage() {
   // ✅ אם התחלף orgId – ננקה נתונים כדי לא לערבב ארגונים
   useEffect(() => {
     setRisks([]);
+    setUsers([]);
     setError(null);
   }, [orgId]);
 
@@ -122,8 +125,17 @@ export default function ReportsPage() {
       setLoading(true);
       setError(null);
       try {
-        const data = await riskService.list({ orgId });
-        setRisks(data);
+        const [riskData, userData] = await Promise.allSettled([
+          riskService.list({ orgId }),
+          userService.list({ orgId }),
+        ]);
+        if (riskData.status === "fulfilled") setRisks(riskData.value);
+        else throw riskData.reason;
+        if (userData.status === "fulfilled") setUsers(userData.value);
+        else {
+          console.error("Reports users load failed", userData.reason);
+          setUsers([]);
+        }
       } catch (e: any) {
         console.error(e);
         setError("נכשלה טעינת דוחות. בדקי שהשרת זמין ושיש OrgId תקין.");
@@ -174,20 +186,32 @@ export default function ReportsPage() {
   const totals = useMemo(() => {
     const total = filtered.length;
     const critical = byClassification["EXTREME_RED"] ?? 0;
-    const high = byClassification["HIGH_ORANGE"] ?? 0;
-    const medium = byClassification["MEDIUM_YELLOW"] ?? 0;
-    const low = byClassification["LOW_GREEN"] ?? 0;
+    const high = byClassification["HIGH_ACTION_ORANGE"] ?? 0;
+    const medium = byClassification["TOLERABLE_YELLOW"] ?? 0;
+    const low = byClassification["NEGLIGIBLE_GREEN"] ?? 0;
     return { total, critical, high, medium, low };
   }, [filtered.length, byClassification]);
+
+  const userLabelById = useMemo(() => {
+    const m: Record<string, string> = {};
+    users.forEach((u) => {
+      const full = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
+      m[u.id] = full || u.email || "לא הוגדר";
+    });
+    return m;
+  }, [users]);
+
+  const riskOwnerLabel = (r: RiskBoundary) =>
+    r.riskManagerUserId ? (userLabelById[r.riskManagerUserId] ?? "לא הוגדר") : "לא הוגדר";
 
   const exportCsv = () => {
     if (!filtered.length) return;
 
     const rows = (filtered as any[]).map((r) => ({
-      id: r.id,
       title: r.title,
       classification: r.classification,
       status: r.status,
+      riskOwner: riskOwnerLabel(r),
       riskScore: r.riskScore,
       frequencyLevel: r.frequencyLevel,
       severityLevel: r.severityLevel,
@@ -222,7 +246,6 @@ export default function ReportsPage() {
           <p className="mt-1 text-muted-foreground">פילוח מצב הסיכונים (לפי טווח תאריכים)</p>
           {loading && <p className="mt-2 text-sm text-muted-foreground">טוען נתונים…</p>}
           {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
-          <p className="mt-1 text-xs text-muted-foreground">debug: orgId={orgId}</p>
         </div>
 
         <div className="flex gap-2">
@@ -327,7 +350,7 @@ export default function ReportsPage() {
             <div key={r.id} className="flex justify-between border-b py-2">
               <span className="font-medium text-foreground">{r.title}</span>
               <span>
-                {classificationLabel(r.classification)} • {statusLabel(r.status)} • מדד {r.riskScore}
+                {classificationLabel(r.classification)} • {statusLabel(r.status)} • עמית הסיכונים: {riskOwnerLabel(r)} • מדד {r.riskScore}
                 {" • "}
                 {r.createdAt ? format(new Date(r.createdAt), "d MMM yyyy", { locale: he }) : ""}
               </span>

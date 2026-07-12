@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/table";
 
 import { getCurrentOrgId } from "@/api/config";
+import { session } from "@/auth/session";
 import { taskService } from "@/api/services/taskService";
 import { riskService } from "@/api/services/riskService";
 import { userService } from "@/api/services/userService";
@@ -43,6 +44,7 @@ import type {
   TaskStatus,
   UserBoundary,
   RiskStatus,
+  RecurrenceUnit,
 } from "@/api/types";
 
 type ViewMode = "cards" | "table" | "list";
@@ -54,6 +56,9 @@ type MitigationRow = {
   status: TaskStatus;
   assigneeUserId?: string;
   dueDate?: string;
+  recurring: boolean;
+  recurrenceInterval?: number;
+  recurrenceUnit?: RecurrenceUnit;
   createdAt: string;
   updatedAt: string;
 
@@ -66,6 +71,19 @@ type MitigationRow = {
   riskLocation?: string;
   riskManagerUserId?: string;
 };
+
+const RECURRENCE_UNIT_LABELS: Record<RecurrenceUnit, string> = {
+  DAY: "ימים",
+  WEEK: "שבועות",
+  MONTH: "חודשים",
+  YEAR: "שנים",
+};
+
+function recurrenceText(item: { recurring?: boolean; recurrenceInterval?: number; recurrenceUnit?: RecurrenceUnit }) {
+  if (!item.recurring) return "חד פעמי";
+  const unit = item.recurrenceUnit ? RECURRENCE_UNIT_LABELS[item.recurrenceUnit] : "תקופה";
+  return `מתבצע אחת ל־${item.recurrenceInterval ?? "?"} ${unit}`;
+}
 
 const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   TODO: "לביצוע",
@@ -116,11 +134,11 @@ function isWithinRange(iso?: string, from?: string, to?: string) {
   return true;
 }
 
-function downloadCsv(filename: string, rows: Record<string, any>[]) {
+function downloadCsv(filename: string, rows: Record<string, unknown>[]) {
   if (!rows.length) return;
 
   const headers = Object.keys(rows[0] ?? {});
-  const escape = (v: any) => {
+  const escape = (v: unknown) => {
     const s = String(v ?? "");
     const needsQuotes = /[,"\n]/.test(s);
     const escaped = s.replace(/"/g, '""');
@@ -142,7 +160,7 @@ function downloadCsv(filename: string, rows: Record<string, any>[]) {
 }
 
 export default function ControlsLibraryPage() {
-  const orgId = getCurrentOrgId();
+  const orgId = session.getUser()?.orgId || getCurrentOrgId();
 
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
 
@@ -165,6 +183,9 @@ export default function ControlsLibraryPage() {
     assigneeUserId: "",
     dueDate: "", // yyyy-mm-dd
     status: "TODO" as TaskStatus,
+    recurring: false,
+    recurrenceInterval: 1,
+    recurrenceUnit: "MONTH" as RecurrenceUnit,
   });
 
   // ✅ פילטרים כלליים (לכל מצבי התצוגה)
@@ -212,16 +233,22 @@ export default function ControlsLibraryPage() {
     setErr(null);
 
     try {
-      const [tasks, riskList, userList] = await Promise.all([
-        taskService.list({ orgId }),
-        riskService.list({ orgId }),
-        userService.list({ orgId }),
+      const tasks = await taskService.list({ orgId });
+      const [riskList, userList] = await Promise.all([
+        riskService.list({ orgId }).catch((e) => {
+          console.warn("Risk metadata load failed for mitigations", e);
+          return [] as RiskBoundary[];
+        }),
+        userService.list({ orgId }).catch((e) => {
+          console.warn("User metadata load failed for mitigations", e);
+          return [] as UserBoundary[];
+        }),
       ]);
 
       const riskMap = new Map<string, RiskBoundary>();
       riskList.forEach((r) => riskMap.set(r.id, r));
 
-      const mapped: MitigationRow[] = (tasks as TaskBoundary[]).map((t) => {
+      const mapped: MitigationRow[] = (tasks ?? []).map((t) => {
         const r = riskMap.get(t.riskId);
         return {
           id: t.id,
@@ -230,16 +257,19 @@ export default function ControlsLibraryPage() {
           status: t.status,
           assigneeUserId: t.assigneeUserId ?? undefined,
           dueDate: t.dueDate ?? undefined,
+          recurring: !!t.recurring,
+          recurrenceInterval: t.recurrenceInterval,
+          recurrenceUnit: t.recurrenceUnit,
           createdAt: t.createdAt,
           updatedAt: t.updatedAt,
 
           riskId: t.riskId,
           riskTitle: r?.title,
-          riskClassification: (r as any)?.classification,
-          riskCategoryCode: (r as any)?.categoryCode,
+          riskClassification: r?.classification,
+          riskCategoryCode: r?.categoryCode,
 
-          riskLocation: (r as any)?.location,
-          riskManagerUserId: (r as any)?.riskManagerUserId,
+          riskLocation: r?.location,
+          riskManagerUserId: r?.riskManagerUserId,
         };
       });
 
@@ -250,7 +280,7 @@ export default function ControlsLibraryPage() {
       setRows(mapped);
     } catch (e) {
       console.error(e);
-      setErr("נכשלה טעינת מיטיגציות. בדקי ש-Task Service + Risk Service רצים ו-orgId תקין.");
+      setErr("נכשלה טעינת מיטיגציות. בדקי ש-Task Service רץ ו-orgId תקין.");
     } finally {
       setLoading(false);
     }
@@ -362,6 +392,9 @@ export default function ControlsLibraryPage() {
       assigneeUserId: "",
       dueDate: "",
       status: "TODO",
+      recurring: false,
+      recurrenceInterval: 1,
+      recurrenceUnit: "MONTH",
     });
     setOpen(true);
   }
@@ -375,6 +408,9 @@ export default function ControlsLibraryPage() {
       assigneeUserId: row.assigneeUserId ?? "",
       dueDate: toDateInputValue(row.dueDate),
       status: row.status,
+      recurring: row.recurring,
+      recurrenceInterval: row.recurrenceInterval ?? 1,
+      recurrenceUnit: row.recurrenceUnit ?? "MONTH",
     });
     setOpen(true);
   }
@@ -385,6 +421,10 @@ export default function ControlsLibraryPage() {
     const title = form.title.trim();
     const description = form.description.trim();
     if (!title) return;
+    if (form.recurring && (!form.recurrenceInterval || form.recurrenceInterval <= 0)) {
+      toast.error("יש להזין מחזוריות חיובית");
+      return;
+    }
 
     try {
       if (!editing) {
@@ -400,6 +440,9 @@ export default function ControlsLibraryPage() {
           description,
           assigneeUserId: form.assigneeUserId.trim() || undefined,
           dueDate: toInstantIsoFromDateInput(form.dueDate),
+          recurring: form.recurring,
+          recurrenceInterval: form.recurring ? form.recurrenceInterval : undefined,
+          recurrenceUnit: form.recurring ? form.recurrenceUnit : undefined,
         });
 
         toast.success("מיטיגציה נוצרה");
@@ -409,14 +452,17 @@ export default function ControlsLibraryPage() {
       }
 
       const taskId = editing.id;
-      const ops: Promise<any>[] = [];
+      const ops: Promise<unknown>[] = [];
 
       ops.push(
         taskService.update(taskId, {
           title,
           description,
           dueDate: toInstantIsoFromDateInput(form.dueDate),
-        } as any)
+          recurring: form.recurring,
+          recurrenceInterval: form.recurring ? form.recurrenceInterval : undefined,
+          recurrenceUnit: form.recurring ? form.recurrenceUnit : undefined,
+        })
       );
 
       if (form.status !== editing.status) {
@@ -461,6 +507,7 @@ export default function ControlsLibraryPage() {
       status: t.status,
       assignee: t.assigneeUserId ? (userLabelById[t.assigneeUserId] ?? t.assigneeUserId) : "",
       dueDate: t.dueDate ?? "",
+      recurrence: recurrenceText(t),
       riskLocation: t.riskLocation ?? "",
       riskManager: t.riskManagerUserId ? (userLabelById[t.riskManagerUserId] ?? t.riskManagerUserId) : "",
       updatedAt: t.updatedAt,
@@ -558,7 +605,7 @@ export default function ControlsLibraryPage() {
 
           <div className="grid gap-1 lg:max-w-[260px]">
             <div className="text-sm text-muted-foreground">סטטוס</div>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as TaskStatus | "ALL")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -600,6 +647,7 @@ export default function ControlsLibraryPage() {
                   <TableHead className="text-center">סטטוס</TableHead>
                   <TableHead className="text-right">אחראי מיטיגציה</TableHead>
                   <TableHead className="text-right">תאריך יעד</TableHead>
+                  <TableHead className="text-right">מחזוריות</TableHead>
                   <TableHead className="text-right">עודכן</TableHead>
                   <TableHead className="text-center">פעולות</TableHead>
                 </TableRow>
@@ -647,6 +695,7 @@ export default function ControlsLibraryPage() {
 
                         <TableCell className="text-right">{assigneeName}</TableCell>
                         <TableCell className="text-right">{due}</TableCell>
+                        <TableCell className="text-right">{recurrenceText(t)}</TableCell>
                         <TableCell className="text-right">{upd}</TableCell>
 
                         <TableCell className="text-center">
@@ -666,7 +715,7 @@ export default function ControlsLibraryPage() {
 
                 {!loading && groupedByRisk.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-right text-muted-foreground">
+                    <TableCell colSpan={10} className="text-right text-muted-foreground">
                       אין מיטיגציות להצגה.
                     </TableCell>
                   </TableRow>
@@ -722,6 +771,9 @@ export default function ControlsLibraryPage() {
                       </span>
                     </span>
                     <span>
+                      מחזוריות: <span className="text-foreground">{recurrenceText(t)}</span>
+                    </span>
+                    <span>
                       עודכן:{" "}
                       <span className="text-foreground">
                         {t.updatedAt ? format(new Date(t.updatedAt), "d MMM yyyy", { locale: he }) : "—"}
@@ -769,7 +821,7 @@ export default function ControlsLibraryPage() {
                     </div>
                     <div className="font-medium truncate">{t.title}</div>
                     <div className="text-xs text-muted-foreground">
-                      אחראי: {assigneeName} • יעד: {t.dueDate ? format(new Date(t.dueDate), "d MMM yyyy", { locale: he }) : "—"}
+                      אחראי: {assigneeName} • יעד: {t.dueDate ? format(new Date(t.dueDate), "d MMM yyyy", { locale: he }) : "—"} • {recurrenceText(t)}
                     </div>
                   </div>
 
@@ -857,6 +909,46 @@ export default function ControlsLibraryPage() {
                   onChange={(e) => setForm((p) => ({ ...p, dueDate: e.target.value }))}
                 />
               </div>
+            </div>
+
+            <div className="rounded-lg border p-3 space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={form.recurring}
+                  onChange={(e) => setForm((p) => ({ ...p, recurring: e.target.checked }))}
+                />
+                מחזוריות
+              </label>
+
+              {form.recurring && (
+                <div className="grid grid-cols-[1fr_1.4fr] gap-3">
+                  <div className="grid gap-1">
+                    <label className="text-sm text-muted-foreground">כל כמה?</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={form.recurrenceInterval}
+                      onChange={(e) => setForm((p) => ({ ...p, recurrenceInterval: Math.max(1, Number(e.target.value) || 1) }))}
+                    />
+                  </div>
+                  <div className="grid gap-1">
+                    <label className="text-sm text-muted-foreground">יחידה</label>
+                    <Select value={form.recurrenceUnit} onValueChange={(v) => setForm((p) => ({ ...p, recurrenceUnit: v as RecurrenceUnit }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="DAY">ימים</SelectItem>
+                        <SelectItem value="WEEK">שבועות</SelectItem>
+                        <SelectItem value="MONTH">חודשים</SelectItem>
+                        <SelectItem value="YEAR">שנים</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2 text-xs text-muted-foreground">
+                    מתבצע אחת ל־{form.recurrenceInterval} {RECURRENCE_UNIT_LABELS[form.recurrenceUnit]}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid gap-1">

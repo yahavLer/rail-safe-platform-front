@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import type { AxiosError } from "axios";
 import {
   aiRiskAnalysisService,
   type AiRiskAnalysisBoundary,
@@ -82,7 +83,17 @@ export function AiRiskImageUpload({
           setAnalysis(result);
           onAnalysisComplete?.(result, file);
 
-          if (result.hazardDetected) {
+          const isManualFallback = result.aiProvider === "MANUAL_FALLBACK";
+
+          if (isManualFallback) {
+            toast.warning("נוצרה טיוטה ידנית", {
+              description: "שירות ה-AI אינו זמין כרגע. אפשר לערוך את הפרטים ולהמשיך ביצירת הסיכון.",
+            });
+          } else if (result.status === "FAILED") {
+            toast.error("ניתוח התמונה נכשל", {
+              description: result.draft.description ?? "שירות ה-AI אינו זמין כרגע. אפשר לנסות שוב מאוחר יותר.",
+            });
+          } else if (result.hazardDetected) {
             toast.success("זוהה סיכון בתמונה", {
               description: result.draft.title ?? result.draft.description ?? "",
             });
@@ -90,8 +101,13 @@ export function AiRiskImageUpload({
             toast.info("לא זוהה מפגע מובהק בתמונה");
           }
         } catch (error) {
+          const err = error as AxiosError<any>;
+          const status = err.response?.status;
+          const serverMessage = err.response?.data?.message || err.response?.data?.error;
           console.error("Failed to analyze image:", error);
-          toast.error("שגיאה בניתוח התמונה");
+          toast.error("ניתוח התמונה נכשל", {
+            description: serverMessage || (status ? `שירות ה-AI החזיר שגיאה ${status}. נסי שוב מאוחר יותר.` : "שירות ה-AI אינו זמין כרגע. נסי שוב מאוחר יותר."),
+          });
         } finally {
           setIsAnalyzing(false);
         }
@@ -249,21 +265,29 @@ export function AiRiskImageUpload({
             <div
               className={cn(
                 "animate-fade-in rounded-xl border p-4",
-                analysis.hazardDetected
-                  ? "border-risk-critical/30 bg-risk-critical-bg"
-                  : "border-risk-low/30 bg-risk-low-bg"
+                analysis.aiProvider === "MANUAL_FALLBACK"
+                  ? "border-amber-300 bg-amber-50"
+                  : analysis.status === "FAILED"
+                    ? "border-destructive/30 bg-destructive/5"
+                    : analysis.hazardDetected
+                    ? "border-risk-critical/30 bg-risk-critical-bg"
+                    : "border-risk-low/30 bg-risk-low-bg"
               )}
             >
               <div className="flex items-start gap-3">
                 <div
                   className={cn(
                     "flex h-10 w-10 items-center justify-center rounded-lg",
-                    analysis.hazardDetected
-                      ? "bg-risk-critical/10 text-risk-critical"
-                      : "bg-risk-low/10 text-risk-low"
+                    analysis.aiProvider === "MANUAL_FALLBACK"
+                      ? "bg-amber-100 text-amber-700"
+                      : analysis.status === "FAILED"
+                        ? "bg-destructive/10 text-destructive"
+                        : analysis.hazardDetected
+                        ? "bg-risk-critical/10 text-risk-critical"
+                        : "bg-risk-low/10 text-risk-low"
                   )}
                 >
-                  {analysis.hazardDetected ? (
+                  {analysis.status === "FAILED" || analysis.hazardDetected ? (
                     <AlertTriangle className="h-5 w-5" />
                   ) : (
                     <CheckCircle className="h-5 w-5" />
@@ -274,7 +298,11 @@ export function AiRiskImageUpload({
                   <div className="mb-1 flex items-center gap-2">
                     <Bot className="h-4 w-4 text-primary" />
                     <span className="text-sm font-medium text-primary">
-                      טיוטת AI
+                      {analysis.aiProvider === "MANUAL_FALLBACK"
+                        ? "טיוטה ידנית"
+                        : analysis.status === "FAILED"
+                          ? "ניתוח AI נכשל"
+                          : "טיוטת AI"}
                     </span>
                     {analysis.confidence > 0 && (
                       <span className="text-xs text-muted-foreground">

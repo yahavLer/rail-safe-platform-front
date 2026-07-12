@@ -15,6 +15,17 @@ interface Props {
   orgId: string;
 }
 
+const SEVERITY_DETAILS: Record<number, { label: string; formula: string; description: string }> = {
+  4: { label: "אסון", formula: "FWSI >= 10", description: "הרוגים מרובים ו/או נזק ישיר לרכוש מעל 65 מיליון ₪." },
+  3: { label: "קריטי / גבוהה", formula: "1 <= FWSI < 10", description: "מספר נמוך של הרוגים ו/או נזק ישיר לרכוש בין 7 ל-65 מיליון ₪." },
+  2: { label: "בינוני / גבולי", formula: "0.1 <= FWSI < 1", description: "מספר פצועים קשה ו/או נזק ישיר לרכוש בין 1 ל-7 מיליון ₪." },
+  1: { label: "זניח", formula: "FWSI < 0.1", description: "פציעה קלה ו/או נזק ישיר נמוך." },
+};
+
+function displayDescription(levelDef: LevelDefinitionBoundary) {
+  return levelDef.description?.trim() || SEVERITY_DETAILS[levelDef.level]?.description || "";
+}
+
 export default function SeverityLevelsTab({ orgId }: Props) {
   const [levels, setLevels] = useState<LevelDefinitionBoundary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +39,7 @@ export default function SeverityLevelsTab({ orgId }: Props) {
     try {
       setLoading(true);
       const matrix = await organizationService.getRiskMatrix(orgId);
-      setLevels(matrix.severityLevels || []);
+      setLevels((matrix.severityLevels || []).map((level) => ({ ...level, description: displayDescription(level) })));
     } catch (e: any) {
       toast.error("שגיאה בטעינת רמות חומרה", {
         description: e?.response?.data?.message || e?.message,
@@ -98,17 +109,17 @@ interface LevelCardProps {
 }
 
 function LevelCard({ levelDef, onSave, isSaving }: LevelCardProps) {
-  const [description, setDescription] = useState(levelDef.description || "");
+  const [description, setDescription] = useState(displayDescription(levelDef));
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
-    setDescription(levelDef.description || "");
+    setDescription(displayDescription(levelDef));
     setHasChanges(false);
   }, [levelDef.description]);
 
   const handleChange = (value: string) => {
     setDescription(value);
-    setHasChanges(value !== (levelDef.description || ""));
+    setHasChanges(value !== displayDescription(levelDef));
   };
 
   const handleSave = async () => {
@@ -145,8 +156,8 @@ function LevelCard({ levelDef, onSave, isSaving }: LevelCardProps) {
               {levelDef.level}
             </div>
             <div>
-              <CardTitle>{levelDef.label}</CardTitle>
-              <CardDescription>רמת חומרה {levelDef.level}</CardDescription>
+              <CardTitle>{SEVERITY_DETAILS[levelDef.level]?.label ?? levelDef.label}</CardTitle>
+              <CardDescription>דירוג {levelDef.level}</CardDescription>
             </div>
           </div>
           <Button
@@ -166,13 +177,19 @@ function LevelCard({ levelDef, onSave, isSaving }: LevelCardProps) {
         </div>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 grid gap-2 rounded-md border bg-white/70 p-3 text-sm md:grid-cols-[120px_1fr]">
+          <div className="text-muted-foreground">טווח</div>
+          <div dir="ltr" className="text-left font-mono md:text-right">{SEVERITY_DETAILS[levelDef.level]?.formula}</div>
+          <div className="text-muted-foreground">דוגמה</div>
+          <div>{SEVERITY_DETAILS[levelDef.level]?.description}</div>
+        </div>
         <div className="space-y-2">
           <Label htmlFor={`sev-desc-${levelDef.level}`}>תיאור מפורט</Label>
           <Textarea
             id={`sev-desc-${levelDef.level}`}
             value={description}
             onChange={(e) => handleChange(e.target.value)}
-            placeholder={`הגדר את התיאור עבור רמת חומרה ${levelDef.level} - ${levelDef.label}`}
+            placeholder={SEVERITY_DETAILS[levelDef.level]?.description ?? `הגדר את התיאור עבור רמת חומרה ${levelDef.level}`}
             rows={4}
             className="resize-none bg-white"
           />

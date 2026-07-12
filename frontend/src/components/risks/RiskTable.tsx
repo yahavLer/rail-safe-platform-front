@@ -8,8 +8,6 @@ import {
   Eye,
   Edit,
   MapPin,
-  Bot,
-  Image as ImageIcon,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -84,31 +82,6 @@ const slaStyles = {
   OVERDUE: "text-risk-critical",
 } as const;
 
-function RiskImageThumbnail({ imageUrl }: { imageUrl?: string }) {
-  if (!imageUrl) {
-    return <span className="text-sm text-muted-foreground">—</span>;
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        window.open(imageUrl, "_blank", "noopener,noreferrer");
-      }}
-      className="group inline-flex items-center gap-2"
-      title="פתחי תמונה"
-    >
-      <img
-        src={imageUrl}
-        alt="תמונת סיכון"
-        className="h-10 w-14 rounded-md border object-cover transition-opacity group-hover:opacity-90"
-      />
-      <span className="text-xs text-primary underline">צפייה</span>
-    </button>
-  );
-}
-
 export function RiskTable({
   orgId,
   risks,
@@ -160,23 +133,11 @@ export function RiskTable({
             <TableHead className="text-center font-semibold">סטטוס</TableHead>
             <TableHead className="text-right font-semibold">מיקום</TableHead>
             <TableHead className="text-right font-semibold">אחראי הסיכון</TableHead>
-            <TableHead className="text-center font-semibold">SLA</TableHead>
-            <TableHead className="text-center font-semibold">AI</TableHead>
-            <TableHead className="text-center font-semibold">תמונה</TableHead>
-            <TableHead className="text-center font-semibold">פעולות</TableHead>
           </TableRow>
         </TableHeader>
 
         <TableBody>
           {rows.map((risk, index) => {
-            const sourceImageUrl = (risk as any).sourceImageUrl as string | undefined;
-            const hasImage = Boolean(sourceImageUrl);
-            const slaStatus = (risk as any)?.slaStatus as
-              | "ON_TIME"
-              | "AT_RISK"
-              | "OVERDUE"
-              | undefined;
-            const aiProcessedAt = (risk as any)?.aiProcessedAt as string | undefined;
             const categoryName = categoryNameByCode?.[risk.categoryCode];
             const isExpanded = expandedRiskId === risk.id;
 
@@ -192,9 +153,6 @@ export function RiskTable({
                 >
                   <TableCell className="max-w-[250px]">
                     <div className="flex items-center gap-2">
-                      {hasImage && (
-                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                      )}
                       <span className="line-clamp-1 font-medium">{risk.title}</span>
                     </div>
                   </TableCell>
@@ -295,76 +253,16 @@ export function RiskTable({
                   <TableCell>
                     <span className="text-sm">
                       {risk.riskManagerUserId
-                        ? userLabelById?.[risk.riskManagerUserId] ??
-                          `${risk.riskManagerUserId.slice(0, 8)}…`
-                        : "—"}
+                        ? userLabelById?.[risk.riskManagerUserId] ?? "לא הוגדר"
+                        : "לא הוגדר"}
                     </span>
                   </TableCell>
 
-                  <TableCell className="text-center">
-                    {slaStatus ? (
-                      <span className={cn("text-sm font-medium", slaStyles[slaStatus])}>
-                        {slaStatus === "ON_TIME" && "בזמן"}
-                        {slaStatus === "AT_RISK" && "בסיכון"}
-                        {slaStatus === "OVERDUE" && "חריגה"}
-                      </span>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-
-                  <TableCell className="text-center">
-                    {aiProcessedAt || hasImage ? (
-                      <div className="flex items-center justify-center">
-                        <Bot className="h-4 w-4 text-primary" />
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-
-                  <TableCell className="text-center">
-                    <RiskImageThumbnail imageUrl={sourceImageUrl} />
-                  </TableCell>
-
-                  <TableCell>
-                    <div dir="ltr" className="flex items-center justify-start gap-1">
-                      {onEditRisk ? (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEditRisk(risk.id);
-                          }}
-                          aria-label="עריכת סיכון"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                          <Link
-                            to={`/risks/${risk.id}/edit`}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                      )}
-
-                      <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                        <Link to={`/risks/${risk.id}`} onClick={(e) => e.stopPropagation()}>
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </TableCell>
                 </TableRow>
 
                 {isExpanded && (
                   <TableRow className="bg-muted/10">
-                    <TableCell colSpan={11} className="p-0">
+                    <TableCell colSpan={7} className="p-0">
                       <div className="border-t">
                         <RiskInlineDetails
                           orgId={orgId}
